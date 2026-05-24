@@ -1,0 +1,334 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  RATE_LIMITED
+}
+
+enum InsightType {
+  COMMIT_PATTERN
+  LANGUAGE_TREND
+  PRODUCTIVITY_SCORE
+  GROWTH_SUMMARY
+  REPO_ANALYSIS
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Mood {
+  GREAT
+  GOOD
+  NEUTRAL
+  TIRED
+  BLOCKED
+}
+
+// ─────────────────────────────────────────────────────────────
+// USER & IDENTITY
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id        String    @id @default(cuid())
+  clerkId   String    @unique
+  email     String    @unique
+  username  String?   @unique
+  plan      Plan      @default(FREE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete
+
+  // Relations
+  profile       Profile?
+  githubAccount GitHubAccount?
+  repositories  Repository[]
+  syncJobs      SyncJob[]
+  insights      Insight[]
+  aiInsights    AIInsight[]
+  streaks       Streak[]
+  projects      Project[]
+  learningLogs  LearningLog[]
+
+  @@index([clerkId])
+  @@index([email])
+  @@index([deletedAt])
+}
+
+model Profile {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  bio       String?
+  avatarUrl String?
+  location  String?
+  website   String?
+  twitterUrl String?
+  linkedinUrl String?
+  isPublic  Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────
+// GITHUB INTEGRATION
+// ─────────────────────────────────────────────────────────────
+
+model GitHubAccount {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  githubId       String    @unique
+  login          String
+  encryptedToken String    // AES-256-GCM encrypted OAuth token
+  tokenExpiresAt DateTime?
+  scopes         String[]  // e.g. ["repo", "read:user"]
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([githubId])
+}
+
+model Repository {
+  id           String    @id @default(cuid())
+  userId       String
+  githubRepoId String    @unique
+  name         String
+  fullName     String
+  description  String?
+  language     String?   // primary language
+  isPrivate    Boolean   @default(false)
+  isFork       Boolean   @default(false)
+  starCount    Int       @default(0)
+  forkCount    Int       @default(0)
+  openIssueCount Int     @default(0)
+  topics       String[]
+  lastPushedAt DateTime?
+  syncedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commits      Commit[]
+  repoAnalysis RepoAnalysis?
+
+  @@index([userId])
+  @@index([githubRepoId])
+  @@index([language])
+}
+
+model Commit {
+  id           String   @id @default(cuid())
+  repositoryId String
+  sha          String   @unique
+  message      String
+  authorLogin  String?
+  authorEmail  String?
+  committedAt  DateTime
+  additions    Int      @default(0)
+  deletions    Int      @default(0)
+  changedFiles Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@index([repositoryId])
+  @@index([committedAt])
+  @@index([authorLogin])
+}
+
+// ─────────────────────────────────────────────────────────────
+// SYNC OBSERVABILITY
+// ─────────────────────────────────────────────────────────────
+
+model SyncJob {
+  id        String     @id @default(cuid())
+  userId    String
+  status    SyncStatus @default(PENDING)
+  traceId   String?    // correlates with structured logs
+  startedAt DateTime?
+  endedAt   DateTime?
+  errorMsg  String?
+  // Bounded meta — no open-ended blobs
+  // { reposProcessed: number, commitsIngested: number, reposSkipped: number }
+  meta      Json?
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@index([traceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// ANALYTICS & INSIGHTS
+// ─────────────────────────────────────────────────────────────
+
+model Insight {
+  id          String      @id @default(cuid())
+  userId      String
+  type        InsightType
+  // Schema varies per InsightType — validated at service layer
+  data        Json
+  generatedAt DateTime    @default(now())
+  expiresAt   DateTime?   // null = permanent
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([generatedAt])
+}
+
+model Streak {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date // date only, no time
+  committed Boolean  @default(false)
+  mood      Mood?
+  noteCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date]) // one record per user per day
+  @@index([userId])
+  @@index([date])
+}
+
+model RepoAnalysis {
+  id           String   @id @default(cuid())
+  repositoryId String   @unique
+  summary      String   @db.Text
+  // { "TypeScript": 80.5, "CSS": 12.3, "HTML": 7.2 }
+  languages    Json
+  complexity   Float?   // 0-10 score
+  qualityScore Float?   // 0-10 score
+  analyzedAt   DateTime @default(now())
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI SYSTEM
+// ─────────────────────────────────────────────────────────────
+
+model AIInsight {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String   // "nvidia-nim" | "gemini"
+  model      String   // e.g. "meta/llama-3.1-70b-instruct"
+  prompt     String   @db.Text
+  response   String   @db.Text
+  tokensUsed Int?
+  latencyMs  Int?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROJECT MANAGEMENT
+// ─────────────────────────────────────────────────────────────
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  deadline    DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?     // soft delete
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@index([userId, status])
+  @@index([deletedAt])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@index([dueDate])
+}
+
+// ─────────────────────────────────────────────────────────────
+// LEARNING TRACKER
+// ─────────────────────────────────────────────────────────────
+
+model LearningLog {
+  id       String   @id @default(cuid())
+  userId   String
+  topic    String
+  notes    String?  @db.Text
+  source   String?  // URL or resource name
+  tags     String[]
+  duration Int?     // minutes spent
+  loggedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([loggedAt])
+  @@index([tags])
+}
