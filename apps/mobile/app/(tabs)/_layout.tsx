@@ -59,16 +59,21 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0E0E1A',
-          borderTopColor: '#1E1E2E',
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#F0F2F6',
           borderTopWidth: 1,
-          height: 56 + insets.bottom,
-          paddingBottom: insets.bottom,
+          height: 64 + insets.bottom,
+          paddingBottom: insets.bottom + 6,
           paddingTop: 8,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.04,
+          shadowRadius: 10,
+          elevation: 8,
         },
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#444',
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: -2 },
+        tabBarActiveTintColor: '#1A1A1A',
+        tabBarInactiveTintColor: '#A0AEC0',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
         tabBarHideOnKeyboard: true,
       }}
     >

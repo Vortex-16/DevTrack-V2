@@ -61,18 +61,28 @@ function AuthGuard() {
   return <Slot />;
 }
 
+import { useFonts } from 'expo-font';
+
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    'TurboDriverItalic': require('../assets/font/Turbo Driver Italic.otf'),
+  });
+
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   if (!publishableKey) {
     throw new Error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in .env');
   }
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={styles.root}>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <AuthGuard />
         </GestureHandlerRootView>
       </QueryClientProvider>
@@ -81,5 +91,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0A0A0F' },
+  root: { flex: 1, backgroundColor: '#F8F9FC' },
 });

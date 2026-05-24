@@ -14,6 +14,14 @@ export const apiClient = axios.create({
   timeout: 15_000,
 });
 
+const randomUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 /**
  * Call this hook once at the app root to wire Clerk token into every request.
  * getToken() fetches from SecureStore cache (no network call if valid).
@@ -29,8 +37,8 @@ export function useApiAuth() {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-      // Propagate a trace ID for observability
-      config.headers['X-Trace-Id'] = crypto.randomUUID();
+      // Propagate a trace ID for observability safely
+      config.headers['X-Trace-Id'] = randomUUID();
       return config;
     });
 

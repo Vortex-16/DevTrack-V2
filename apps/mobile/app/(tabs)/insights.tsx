@@ -1,11 +1,6 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,14 +26,11 @@ interface GenerateResult {
 
 export default function InsightsScreen() {
   const queryClient = useQueryClient();
-  const [showLatestOnly, setShowLatestOnly] = useState(false);
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['ai-insights'],
     queryFn: async () => {
-      const res = await apiClient.get<{ insights: AIInsight[]; count: number }>(
-        '/api/v1/ai/insights?limit=20',
-      );
+      const res = await apiClient.get<{ insights: AIInsight[]; count: number }>('/api/v1/ai/insights?limit=20');
       return res.data;
     },
   });
@@ -48,9 +40,7 @@ export default function InsightsScreen() {
       const res = await apiClient.post<GenerateResult>('/api/v1/ai/insights/generate');
       return res.data;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['ai-insights'] });
-    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['ai-insights'] }),
   });
 
   return (
@@ -59,46 +49,39 @@ export default function InsightsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.pageTitle}>AI Insights</Text>
-          <Text style={styles.pageSubtitle}>Powered by NVIDIA NIM + Gemini</Text>
+          <Text style={styles.pageSubtitle}>Powered by Groq + Gemini</Text>
         </View>
         <TouchableOpacity
-          style={[
-            styles.generateButton,
-            generateMutation.isPending && styles.generateButtonDisabled,
-          ]}
+          style={[styles.generateButton, generateMutation.isPending && styles.generateButtonDisabled]}
           onPress={() => generateMutation.mutate()}
           disabled={generateMutation.isPending}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          {generateMutation.isPending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.generateButtonText}>✦ Generate</Text>
-          )}
+          {generateMutation.isPending
+            ? <ActivityIndicator color="#FFFFFF" size="small" />
+            : <Text style={styles.generateButtonText}>✦ Generate</Text>
+          }
         </TouchableOpacity>
       </View>
 
-      {/* Latest generated insight flash */}
+      {/* Newly generated insight banner */}
       {generateMutation.data && (
-        <View style={styles.newInsightBanner}>
-          <View style={styles.newInsightHeader}>
-            <Text style={styles.newInsightLabel}>✦ Just Generated</Text>
+        <View style={styles.newBanner}>
+          <View style={styles.newBannerHeader}>
+            <Text style={styles.newBannerLabel}>✦ Just Generated</Text>
             <ProviderBadge provider={generateMutation.data.provider} />
           </View>
-          <Text style={styles.newInsightText}>{generateMutation.data.text}</Text>
+          <Text style={styles.newBannerText}>{generateMutation.data.text}</Text>
         </View>
       )}
 
-      {/* Generate error */}
+      {/* Error banner */}
       {generateMutation.isError && (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>
-            ⚠ Generation failed — check your AI provider keys
-          </Text>
+          <Text style={styles.errorText}>⚠ Generation failed — check AI provider keys</Text>
         </View>
       )}
 
-      {/* Insight history */}
       {isLoading ? (
         <ActivityIndicator color="#6C63FF" style={{ marginTop: 40 }} />
       ) : (
@@ -109,27 +92,19 @@ export default function InsightsScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={<EmptyState onGenerate={() => generateMutation.mutate()} />}
           refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => void refetch()}
-              tintColor="#6C63FF"
-            />
+            <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} tintColor="#6C63FF" />
           }
           ListHeaderComponent={
-            data && data.count > 0 ? (
-              <Text style={styles.listHeader}>{data.count} insight{data.count !== 1 ? 's' : ''} generated</Text>
-            ) : null
+            data && data.count > 0
+              ? <Text style={styles.listHeader}>{data.count} insight{data.count !== 1 ? 's' : ''} generated</Text>
+              : null
           }
-          renderItem={({ item, index }) => (
-            <InsightCard insight={item} isLatest={index === 0} />
-          )}
+          renderItem={({ item, index }) => <InsightCard insight={item} isLatest={index === 0} />}
         />
       )}
     </SafeAreaView>
   );
 }
-
-/* ── Sub-components ──────────────────────────────────────────── */
 
 function InsightCard({ insight, isLatest }: { insight: AIInsight; isLatest: boolean }) {
   const [expanded, setExpanded] = useState(isLatest);
@@ -149,37 +124,29 @@ function InsightCard({ insight, isLatest }: { insight: AIInsight; isLatest: bool
           </Text>
         </View>
         <View style={styles.cardStats}>
-          {insight.tokensUsed && (
-            <Text style={styles.stat}>{insight.tokensUsed} tok</Text>
-          )}
-          {insight.latencyMs && (
-            <Text style={styles.stat}>{Math.round(insight.latencyMs / 1000)}s</Text>
-          )}
+          {!!insight.tokensUsed && <Text style={styles.stat}>{insight.tokensUsed} tok</Text>}
+          {!!insight.latencyMs && <Text style={styles.stat}>{Math.round(insight.latencyMs / 1000)}s</Text>}
           <Text style={styles.chevron}>{expanded ? '∧' : '∨'}</Text>
         </View>
       </View>
-
-      {expanded ? (
-        <Text style={styles.insightText}>{insight.response}</Text>
-      ) : (
-        <Text style={styles.insightPreview} numberOfLines={2}>
-          {insight.response}
-        </Text>
-      )}
+      {expanded
+        ? <Text style={styles.insightText}>{insight.response}</Text>
+        : <Text style={styles.insightPreview} numberOfLines={2}>{insight.response}</Text>
+      }
     </TouchableOpacity>
   );
 }
 
 const PROVIDER_COLORS: Record<string, string> = {
-  'nvidia-nim': '#76B900',
-  gemini: '#4285F4',
+  groq: '#F97316', 'nvidia-nim': '#76B900', gemini: '#4285F4', openai: '#10A37F',
 };
 
 function ProviderBadge({ provider }: { provider: string }) {
-  const color = PROVIDER_COLORS[provider] ?? '#888';
-  const label = provider === 'nvidia-nim' ? 'NVIDIA' : provider === 'gemini' ? 'Gemini' : provider;
+  const color = PROVIDER_COLORS[provider] ?? '#6C63FF';
+  const label = provider === 'nvidia-nim' ? 'NVIDIA'
+    : provider.charAt(0).toUpperCase() + provider.slice(1);
   return (
-    <View style={[styles.badge, { backgroundColor: `${color}20`, borderColor: `${color}60` }]}>
+    <View style={[styles.badge, { backgroundColor: `${color}18`, borderColor: `${color}50` }]}>
       <Text style={[styles.badgeText, { color }]}>{label}</Text>
     </View>
   );
@@ -191,9 +158,9 @@ function EmptyState({ onGenerate }: { onGenerate: () => void }) {
       <Text style={styles.emptyIcon}>✦</Text>
       <Text style={styles.emptyTitle}>No Insights Yet</Text>
       <Text style={styles.emptyText}>
-        Generate your first AI growth insight based on your commit history
+        Generate your first AI growth insight based on your GitHub commit history
       </Text>
-      <TouchableOpacity style={styles.emptyButton} onPress={onGenerate} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.emptyButton} onPress={onGenerate} activeOpacity={0.8}>
         <Text style={styles.emptyButtonText}>Generate First Insight</Text>
       </TouchableOpacity>
     </View>
@@ -201,60 +168,65 @@ function EmptyState({ onGenerate }: { onGenerate: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0F' },
+  container: { flex: 1, backgroundColor: '#F8F9FC' },
+
   header: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12,
+    paddingHorizontal: 24, paddingTop: 20, paddingBottom: 12,
   },
-  pageTitle: { color: '#FFF', fontSize: 28, fontWeight: '700' },
-  pageSubtitle: { color: '#555', fontSize: 12, marginTop: 3 },
+  pageTitle: { fontSize: 30, fontFamily: 'TurboDriverItalic', color: '#0F172A' },
+  pageSubtitle: { color: '#94A3B8', fontSize: 13, marginTop: 3 },
   generateButton: {
-    backgroundColor: '#6C63FF', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 10, minWidth: 100, alignItems: 'center',
+    backgroundColor: '#0F172A', borderRadius: 16,
+    paddingHorizontal: 18, paddingVertical: 12, minWidth: 110, alignItems: 'center',
   },
-  generateButtonDisabled: { opacity: 0.6 },
-  generateButtonText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
-  newInsightBanner: {
-    marginHorizontal: 20, marginBottom: 8,
-    backgroundColor: '#6C63FF15', borderRadius: 16,
-    borderWidth: 1, borderColor: '#6C63FF40', padding: 16,
+  generateButtonDisabled: { opacity: 0.5 },
+  generateButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+
+  newBanner: {
+    marginHorizontal: 24, marginBottom: 8,
+    backgroundColor: '#6C63FF10', borderRadius: 20,
+    borderWidth: 1, borderColor: '#6C63FF30', padding: 18,
   },
-  newInsightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  newInsightLabel: { color: '#6C63FF', fontSize: 12, fontWeight: '700' },
-  newInsightText: { color: '#DDD', fontSize: 14, lineHeight: 22 },
+  newBannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  newBannerLabel: { color: '#6C63FF', fontSize: 12, fontWeight: '700' },
+  newBannerText: { color: '#0F172A', fontSize: 14, lineHeight: 22 },
+
   errorBanner: {
-    marginHorizontal: 20, marginBottom: 8,
-    backgroundColor: '#FF6B6B15', borderRadius: 12,
-    padding: 12, borderWidth: 1, borderColor: '#FF6B6B40',
+    marginHorizontal: 24, marginBottom: 8,
+    backgroundColor: '#EF444415', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#EF444430',
   },
-  errorText: { color: '#FF6B6B', fontSize: 13 },
-  list: { paddingHorizontal: 20, paddingBottom: 40, gap: 10 },
-  listHeader: { color: '#555', fontSize: 12, marginBottom: 4 },
+  errorText: { color: '#EF4444', fontSize: 13, fontWeight: '500' },
+
+  list: { paddingHorizontal: 24, paddingBottom: 40, gap: 10 },
+  listHeader: { color: '#94A3B8', fontSize: 12, marginBottom: 4 },
+
   card: {
-    backgroundColor: '#161622', borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: '#1E1E2E',
+    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18,
+    borderWidth: 1, borderColor: '#F1F5F9', gap: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   cardLatest: { borderColor: '#6C63FF30' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardDate: { color: '#555', fontSize: 12 },
+  cardDate: { color: '#94A3B8', fontSize: 12 },
   cardStats: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stat: { color: '#444', fontSize: 11 },
-  chevron: { color: '#555', fontSize: 14 },
-  insightText: { color: '#CCC', fontSize: 14, lineHeight: 22 },
-  insightPreview: { color: '#888', fontSize: 13, lineHeight: 20 },
-  badge: {
-    borderWidth: 1, borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 2,
-  },
-  badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyIcon: { fontSize: 40, color: '#6C63FF', marginBottom: 16 },
-  emptyTitle: { color: '#FFF', fontSize: 22, fontWeight: '700' },
-  emptyText: { color: '#666', fontSize: 14, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  stat: { color: '#CBD5E1', fontSize: 11 },
+  chevron: { color: '#94A3B8', fontSize: 14 },
+  insightText: { color: '#334155', fontSize: 14, lineHeight: 23 },
+  insightPreview: { color: '#64748B', fontSize: 13, lineHeight: 20 },
+
+  badge: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+
+  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40, gap: 12 },
+  emptyIcon: { fontSize: 44, color: '#6C63FF' },
+  emptyTitle: { color: '#0F172A', fontSize: 22, fontWeight: '700' },
+  emptyText: { color: '#64748B', fontSize: 14, textAlign: 'center', lineHeight: 22 },
   emptyButton: {
-    backgroundColor: '#6C63FF', borderRadius: 12,
-    paddingHorizontal: 24, paddingVertical: 14, marginTop: 24,
+    marginTop: 6, backgroundColor: '#0F172A', borderRadius: 16,
+    paddingHorizontal: 28, paddingVertical: 14,
   },
-  emptyButtonText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
+  emptyButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });
