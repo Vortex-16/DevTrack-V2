@@ -6,13 +6,19 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useSignIn } from '@clerk/clerk-expo';
+import { useSignIn, useOAuth } from '@clerk/clerk-expo';
 import { useRouter, Link } from 'expo-router';
 import { useState, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+
+// Warm up the browser for OAuth
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_github' });
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -36,6 +42,25 @@ export default function SignInScreen() {
     }
   }, [isLoaded, signIn, email, password, setActive, router]);
 
+  const onGitHubSignIn = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { createdSessionId, setActive: setSessionActive } = await startOAuthFlow({
+        redirectUrl: Linking.createURL('/dashboard', { scheme: 'devtrack' }),
+      });
+
+      if (createdSessionId && setSessionActive) {
+        await setSessionActive({ session: createdSessionId });
+        router.replace('/(tabs)/dashboard');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'GitHub OAuth failed';
+      Alert.alert('OAuth Error', message);
+    } finally {
+      setLoading(false);
+    }
+  }, [startOAuthFlow, router]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.inner}>
@@ -43,6 +68,31 @@ export default function SignInScreen() {
         <View style={styles.brand}>
           <Text style={styles.logo}>DevTrack</Text>
           <Text style={styles.tagline}>Developer Intelligence Platform</Text>
+        </View>
+
+        {/* OAuth Buttons */}
+        <View style={styles.oauthContainer}>
+          <TouchableOpacity
+            style={styles.githubButton}
+            onPress={onGitHubSignIn}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <View style={styles.githubContent}>
+                {/* Simple premium custom SVG/Icon placeholder representation */}
+                <Text style={styles.githubText}>Continue with GitHub</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or continue with email</Text>
+          <View style={styles.dividerLine} />
         </View>
 
         {/* Form */}
@@ -118,6 +168,26 @@ const styles = StyleSheet.create({
   },
   tagline: { fontSize: 14, color: '#666', marginTop: 6 },
   form: { gap: 16 },
+  oauthContainer: { marginVertical: 8 },
+  githubButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  githubContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  githubText: { color: '#0F172A', fontSize: 16, fontWeight: '600' },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    gap: 12,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#2A2A3A' },
+  dividerText: { color: '#666', fontSize: 13, fontWeight: '500' },
   inputGroup: { gap: 6 },
   label: { color: '#888', fontSize: 13, fontWeight: '500' },
   input: {
