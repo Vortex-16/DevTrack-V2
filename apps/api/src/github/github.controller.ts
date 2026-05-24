@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Body,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ClerkAuthGuard } from '../auth/clerk.guard';
@@ -32,8 +33,11 @@ export class GithubController {
    */
   @Get('connect')
   @UseGuards(ClerkAuthGuard)
-  connect(@CurrentUser() user: AuthenticatedUser) {
-    const url = this.oauthService.generateAuthUrl(user.id);
+  connect(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('redirect_uri') redirectUri?: string,
+  ) {
+    const url = this.oauthService.generateAuthUrl(user.id, redirectUri);
     return { url };
   }
 
@@ -93,6 +97,8 @@ export class GithubController {
     await this.oauthService.disconnectAccount(user.id);
   }
 
+
+
   /**
    * POST /api/v1/github/sync
    * Manually trigger a sync for the current user. Returns 202 immediately.
@@ -104,5 +110,22 @@ export class GithubController {
     const traceId = crypto.randomUUID();
     void this.githubService.runScheduledSync(traceId);
     return { message: 'Sync started', traceId };
+  }
+
+  /**
+   * GET /api/v1/github/repositories
+   * Returns the list of synced repositories with their commit details.
+   */
+  @Get('repositories')
+  @UseGuards(ClerkAuthGuard)
+  async listRepos(@CurrentUser() user: AuthenticatedUser) {
+    const [repos, account] = await Promise.all([
+      this.githubService.listRepositories(user.id),
+      this.oauthService.getConnectedAccount(user.id),
+    ]);
+    return {
+      repos,
+      githubLogin: account?.login ?? null,
+    };
   }
 }

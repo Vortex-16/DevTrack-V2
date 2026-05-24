@@ -6,6 +6,7 @@ import { GithubTokenService } from './github-token.service';
 interface OAuthStateEntry {
   userId: string;
   expiresAt: number;
+  redirectUri?: string;
 }
 
 interface GitHubTokenResponse {
@@ -49,7 +50,7 @@ export class GithubOAuthService {
 
   // ── State management ──────────────────────────────────────────
 
-  generateAuthUrl(userId: string): string {
+  generateAuthUrl(userId: string, redirectUri?: string): string {
     // Clean expired states first
     this.pruneExpiredStates();
 
@@ -57,6 +58,7 @@ export class GithubOAuthService {
     this.stateStore.set(state, {
       userId,
       expiresAt: Date.now() + GithubOAuthService.STATE_TTL_MS,
+      ...(redirectUri ? { redirectUri } : {}),
     });
 
     const clientId = this.config.get<string>('GITHUB_CLIENT_ID') ?? '';
@@ -70,11 +72,11 @@ export class GithubOAuthService {
       state,
     });
 
-    this.logger.debug({ msg: 'Generated OAuth URL', userId, state });
+    this.logger.debug({ msg: 'Generated OAuth URL', userId, state, redirectUri });
     return `https://github.com/login/oauth/authorize?${params.toString()}`;
   }
 
-  private consumeState(state: string): string | null {
+  private consumeState(state: string): OAuthStateEntry | null {
     const entry = this.stateStore.get(state);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
@@ -82,7 +84,7 @@ export class GithubOAuthService {
       return null;
     }
     this.stateStore.delete(state); // one-time use
-    return entry.userId;
+    return entry;
   }
 
   private pruneExpiredStates(): void {
@@ -96,10 +98,12 @@ export class GithubOAuthService {
 
   async handleCallback(code: string, state: string): Promise<string> {
     // 1. Validate state — prevents CSRF
-    const userId = this.consumeState(state);
-    if (!userId) {
+    const entry = this.consumeState(state);
+    if (!entry) {
       throw new BadRequestException('Invalid or expired OAuth state');
     }
+
+    const { userId, redirectUri } = entry;
 
     // 2. Exchange code for access token
     const tokenData = await this.exchangeCode(code);
@@ -112,6 +116,12 @@ export class GithubOAuthService {
 
     // 4. Encrypt token and upsert GitHubAccount
     const encryptedToken = this.tokenService.encrypt(tokenData.access_token);
+
+    // Clean wipe any existing cached repositories and streaks to prevent old/mock data contamination
+    await this.prisma.$transaction([
+      this.prisma.repository.deleteMany({ where: { userId } }),
+      this.prisma.streak.deleteMany({ where: { userId } }),
+    ]);
 
     await this.prisma.gitHubAccount.upsert({
       where: { userId },
@@ -132,14 +142,20 @@ export class GithubOAuthService {
     this.logger.log({ msg: 'GitHub account connected', userId, login: ghUser.login });
 
     // 5. Return deep link for mobile redirect
-    const deepLinkBase = this.config.get<string>('MOBILE_DEEP_LINK_BASE') ?? 'devtrack://oauth/github';
+    const deepLinkBase = redirectUri ?? this.config.get<string>('MOBILE_DEEP_LINK_BASE') ?? 'devtrack://oauth/github';
     return `${deepLinkBase}?success=true&login=${encodeURIComponent(ghUser.login)}`;
   }
 
   async disconnectAccount(userId: string): Promise<void> {
-    await this.prisma.gitHubAccount.deleteMany({ where: { userId } });
-    this.logger.log({ msg: 'GitHub account disconnected', userId });
+    await this.prisma.$transaction([
+      this.prisma.gitHubAccount.deleteMany({ where: { userId } }),
+      this.prisma.repository.deleteMany({ where: { userId } }),
+      this.prisma.streak.deleteMany({ where: { userId } }),
+    ]);
+    this.logger.log({ msg: 'GitHub account disconnected and user repositories/streaks wiped', userId });
   }
+
+
 
   async getConnectedAccount(userId: string) {
     return this.prisma.gitHubAccount.findUnique({

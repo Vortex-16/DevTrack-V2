@@ -4,6 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 import { GithubApiClient } from './github-api.client';
 import { GithubTokenService } from './github-token.service';
 import { Prisma, SyncStatus } from '@devtrack/database';
+import { Octokit } from '@octokit/rest';
 
 /**
  * GithubService — orchestrates the full sync pipeline.
@@ -64,9 +65,11 @@ export class GithubService {
 
     try {
       const token = this.tokenService.decrypt(account.encryptedToken);
+      let repos: any[] = [];
+      let commitsIngested = 0;
+
       const octokit = this.apiClient.createClient(token);
 
-      // Pre-flight rate limit check
       const rateLimit = await this.apiClient.getRateLimitInfo(octokit);
       if (!this.apiClient.isSafeToFetch(rateLimit)) {
         this.logger.warn({
@@ -84,13 +87,10 @@ export class GithubService {
         return;
       }
 
-      // Fetch and upsert repositories
-      const repos = await octokit.paginate(octokit.repos.listForAuthenticatedUser, {
+      repos = await octokit.paginate(octokit.repos.listForAuthenticatedUser, {
         per_page: 100,
         sort: 'pushed',
       });
-
-      let commitsIngested = 0;
 
       for (const repo of repos) {
         const upsertedRepo = await this.prisma.repository.upsert({
@@ -123,39 +123,41 @@ export class GithubService {
           },
         });
 
-        // Fetch recent commits (last 90 days only — bounded ingestion)
         const since = new Date();
         since.setDate(since.getDate() - 90);
 
         try {
           const commits = await octokit.paginate(octokit.repos.listCommits, {
-            owner: account.login,
+            owner: repo.owner?.login ?? account.login,
             repo: repo.name,
             since: since.toISOString(),
             per_page: 100,
           });
 
+          const commitsData: Prisma.CommitCreateManyInput[] = [];
           for (const commit of commits) {
             if (!commit.commit.author?.date) continue;
-            await this.prisma.commit.upsert({
-              where: { sha: commit.sha },
-              create: {
-                repositoryId: upsertedRepo.id,
-                sha: commit.sha,
-                message: commit.commit.message.slice(0, 500), // cap length
-                authorLogin: commit.author?.login ?? null,
-                authorEmail: commit.commit.author?.email ?? null,
-                committedAt: new Date(commit.commit.author.date),
-                additions: commit.stats?.additions ?? 0,
-                deletions: commit.stats?.deletions ?? 0,
-                changedFiles: commit.stats?.total ?? 0,
-              },
-              update: {}, // SHA is immutable — no updates needed
+            commitsData.push({
+              repositoryId: upsertedRepo.id,
+              sha: commit.sha,
+              message: commit.commit.message.slice(0, 500),
+              authorLogin: commit.author?.login ?? null,
+              authorEmail: commit.commit.author?.email ?? null,
+              committedAt: new Date(commit.commit.author.date),
+              additions: commit.stats?.additions ?? 0,
+              deletions: commit.stats?.deletions ?? 0,
+              changedFiles: commit.stats?.total ?? 0,
             });
-            commitsIngested++;
+          }
+
+          if (commitsData.length > 0) {
+            await this.prisma.commit.createMany({
+              data: commitsData,
+              skipDuplicates: true,
+            });
+            commitsIngested += commitsData.length;
           }
         } catch (_e) {
-          // Some repos may block commit listing — non-fatal, continue
           this.logger.warn({ msg: 'Failed to fetch commits', repo: repo.full_name, traceId });
         }
       }
@@ -166,7 +168,6 @@ export class GithubService {
         reposSkipped: 0,
       });
 
-      // Emit domain event — analytics engine listens to recompute streaks/velocity
       this.events.emit('github.sync.completed', { userId, traceId });
 
     } catch (error) {
@@ -191,6 +192,20 @@ export class GithubService {
         meta: meta !== undefined ? (meta as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         errorMsg: errorMsg ?? null,
       },
+    });
+  }
+
+  async listRepositories(userId: string) {
+    return this.prisma.repository.findMany({
+      where: { userId },
+      include: {
+        commits: {
+          orderBy: { committedAt: 'desc' },
+          take: 5,
+        },
+        _count: { select: { commits: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 }

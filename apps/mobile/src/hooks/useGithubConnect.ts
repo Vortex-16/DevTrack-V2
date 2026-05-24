@@ -43,7 +43,7 @@ export function useGithubConnect() {
       const parsed = Linking.parse(url);
 
       // Only handle our OAuth deep links
-      if (parsed.scheme !== 'devtrack' || parsed.path !== 'oauth/github') return;
+      if (parsed.path !== 'oauth/github') return;
 
       const success = parsed.queryParams?.success === 'true';
       const login = parsed.queryParams?.login as string | undefined;
@@ -67,15 +67,17 @@ export function useGithubConnect() {
   const connect = useCallback(async () => {
     setState({ status: 'connecting' });
     try {
-      // 1. Get OAuth URL from our API (includes state param)
-      const res = await apiClient.get<{ url: string }>('/api/v1/github/connect');
+      // Create dynamic deep link depending on environment (Expo Go vs Standalone)
+      const redirectUri = Linking.createURL('oauth/github');
+
+      // 1. Get OAuth URL from our API, passing our dynamic redirect URI
+      const res = await apiClient.get<{ url: string }>(
+        `/api/v1/github/connect?redirect_uri=${encodeURIComponent(redirectUri)}`
+      );
       const { url } = res.data;
 
-      // 2. Open in secure in-app browser
-      const result = await WebBrowser.openAuthSessionAsync(
-        url,
-        'devtrack://oauth/github', // redirect URL to watch for
-      );
+      // 2. Open in secure in-app browser, watching for our dynamic redirect URI
+      const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
 
       if (result.type === 'success') {
         // Deep link handled by Linking listener above

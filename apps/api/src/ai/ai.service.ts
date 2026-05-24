@@ -1,13 +1,14 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { NvidiaNimProvider } from './providers/nvidia-nim.provider';
+import { GroqProvider } from './providers/groq.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { AIOptions, AIResult } from './providers/ai-provider.interface';
 
 /**
  * AiService — orchestrates the provider fallback chain.
  *
- * Chain: NVIDIA NIM → Gemini → ServiceUnavailableException
+ * Chain: NVIDIA NIM → Groq → Gemini → ServiceUnavailableException
  *
  * All completions are logged to AIInsight table for:
  * - Cost auditing
@@ -24,6 +25,7 @@ export class AiService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly nvidia: NvidiaNimProvider,
+    private readonly groq: GroqProvider,
     private readonly gemini: GeminiProvider,
   ) {}
 
@@ -60,7 +62,7 @@ export class AiService {
     prompt: string,
     options: AIOptions,
   ): Promise<AIResult> {
-    const providers = [this.nvidia, this.gemini];
+    const providers = [this.nvidia, this.groq, this.gemini];
 
     for (const provider of providers) {
       const available = await provider.isAvailable();
@@ -79,8 +81,6 @@ export class AiService {
       }
     }
 
-    throw new ServiceUnavailableException(
-      'All AI providers are currently unavailable',
-    );
+    throw new ServiceUnavailableException('All configured AI providers failed to generate a response. Please check your API keys.');
   }
 }

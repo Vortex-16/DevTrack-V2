@@ -79,12 +79,26 @@ export class StreakService {
       select: { date: true },
     });
 
-    let streak = 0;
+    if (streaks.length === 0) return 0;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const latest = new Date(streaks[0]!.date);
+    latest.setHours(0, 0, 0, 0);
+
+    if (latest.getTime() < yesterday.getTime()) {
+      return 0;
+    }
+
+    const referenceDate = latest;
+    let streak = 0;
+
     for (let i = 0; i < streaks.length; i++) {
-      const expected = new Date(today);
+      const expected = new Date(referenceDate);
       expected.setDate(expected.getDate() - i);
       const actual = new Date(streaks[i]!.date);
       actual.setHours(0, 0, 0, 0);

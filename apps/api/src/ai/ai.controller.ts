@@ -33,12 +33,21 @@ class InsightsQueryDto {
   limit?: number;
 }
 
+import { ElevenLabsService } from './providers/elevenlabs.service';
+
+class ChatAssistantDto {
+  @IsString()
+  @MaxLength(2000)
+  message!: string;
+}
+
 @Controller({ path: 'ai', version: '1' })
 @UseGuards(ClerkAuthGuard)
 export class AiController {
   constructor(
     private readonly aiService: AiService,
     private readonly prisma: PrismaService,
+    private readonly elevenLabs: ElevenLabsService,
   ) {}
 
   /**
@@ -150,9 +159,102 @@ Provide a concise 3-4 sentence growth insight with one specific, actionable reco
 
     return {
       text: result.text,
+      response: result.text,
       provider: result.provider,
       model: result.model,
       generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * POST /api/v1/ai/assistant/chat
+   * RAG-powered developer workspace AI Assistant.
+   * Leverages projects, tasks, repositories, and commits context.
+   * Can return optional ElevenLabs base64 voice feedback.
+   */
+  @Post('assistant/chat')
+  async assistantChat(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChatAssistantDto,
+  ) {
+    // 1. Gather RAG context (projects, tasks, repos, commits)
+    const [projects, repos] = await Promise.all([
+      this.prisma.project.findMany({
+        where: { userId: user.id, deletedAt: null },
+        include: { tasks: true },
+      }),
+      this.prisma.repository.findMany({
+        where: { userId: user.id },
+        include: {
+          commits: {
+            orderBy: { committedAt: 'desc' },
+            take: 5,
+          },
+        },
+      }),
+    ]);
+
+    // 2. Build contextual representation
+    let contextStr = 'USER WORKSPACE CONTEXT:\n\n';
+    
+    contextStr += 'PROJECTS AND TASKS:\n';
+    if (projects.length === 0) {
+      contextStr += 'No projects created yet.\n';
+    } else {
+      for (const p of projects) {
+        contextStr += `- Project: ${p.name} (Status: ${p.status})\n`;
+        if (p.description) contextStr += `  Description: ${p.description}\n`;
+        const activeTasks = p.tasks.filter((t) => t.status !== 'DONE');
+        if (activeTasks.length > 0) {
+          contextStr += `  Active Tasks:\n`;
+          for (const t of activeTasks) {
+            contextStr += `    * [${t.status}] ${t.title} (Priority: ${t.priority})\n`;
+          }
+        }
+      }
+    }
+
+    contextStr += '\nGITHUB REPOSITORIES AND RECENT ACTIVITY:\n';
+    if (repos.length === 0) {
+      contextStr += 'No GitHub repositories synced yet. Connection might be pending.\n';
+    } else {
+      for (const r of repos) {
+        contextStr += `- Repo: ${r.fullName} (Language: ${r.language ?? 'Various'})\n`;
+        contextStr += `  Stats: ${r.starCount} stars | ${r.openIssueCount} open issues\n`;
+        if (r.commits.length > 0) {
+          contextStr += `  Recent Commits:\n`;
+          for (const c of r.commits) {
+            contextStr += `    * ${c.message} (${c.committedAt.toISOString().split('T')[0]})\n`;
+          }
+        }
+      }
+    }
+
+    // 3. Complete using our AI pipeline
+    const systemPrompt = `You are DevTrack AI, a professional developer assistant/workspace copilot.
+You have access to the user's local projects, tasks, connected GitHub repositories, and commits.
+Provide a professional, concise (1-3 sentences), highly actionable answer to the user's request.
+Always reference their actual projects/repositories/tasks if relevant to make it specific.
+
+${contextStr}`;
+
+    const completion = await this.aiService.complete(user.id, dto.message, {
+      systemPrompt,
+      maxTokens: 512,
+      temperature: 0.3,
+    });
+
+    // 4. Generate TTS via ElevenLabs if configured
+    let audioBase64: string | null = null;
+    if (await this.elevenLabs.isAvailable()) {
+      audioBase64 = await this.elevenLabs.textToSpeech(completion.text);
+    }
+
+    return {
+      text: completion.text,
+      provider: completion.provider,
+      model: completion.model,
+      audio: audioBase64,
     };
   }
 }

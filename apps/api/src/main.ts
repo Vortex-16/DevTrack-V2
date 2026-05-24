@@ -38,7 +38,7 @@ async function bootstrap() {
   });
 
   const port = parseInt(process.env.PORT ?? '3001', 10);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   // Use process.stdout.write to avoid importing a logger before it's ready
   process.stdout.write(

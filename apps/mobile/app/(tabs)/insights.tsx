@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40, gap: 12 },
   emptyIcon: { fontSize: 44, color: '#6C63FF' },
-  emptyTitle: { color: '#0F172A', fontSize: 22, fontWeight: '700' },
+  emptyTitle: { color: '#0F172A', fontSize: 22, fontFamily: 'TurboDriverItalic' },
   emptyText: { color: '#64748B', fontSize: 14, textAlign: 'center', lineHeight: 22 },
   emptyButton: {
     marginTop: 6, backgroundColor: '#0F172A', borderRadius: 16,

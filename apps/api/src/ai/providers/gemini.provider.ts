@@ -14,11 +14,15 @@ export class GeminiProvider implements AIProvider {
   private readonly logger = new Logger(GeminiProvider.name);
 
   constructor(private readonly config: ConfigService) {
-    this.apiKey = this.config.get<string>('GEMINI_API_KEY') ?? '';
+    this.apiKey = (
+      this.config.get<string>('GEMINI_API_KEY') ??
+      this.config.get<string>('GOOGLE_API_KEY') ??
+      ''
+    ).replace(/^["']|["']$/g, '');
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!this.apiKey;
+    return !!this.apiKey && this.apiKey !== 'AIza...' && this.apiKey !== '';
   }
 
   async complete(prompt: string, options: AIOptions = {}): Promise<AIResult> {

@@ -4,11 +4,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, useUser } from '@clerk/clerk-expo';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/src/api/client';
 import { useGithubConnect } from '@/src/hooks/useGithubConnect';
 import { useRouter } from 'expo-router';
-import Svg, { Path, Circle } from 'react-native-svg';
+import {
+  GithubIcon, SyncIcon, LogOutIcon,
+  LinkIcon, AlertTriangleIcon, CheckIcon,
+} from '@/src/components/Icons';
 
 interface UserProfile {
   id: string;
@@ -25,7 +28,7 @@ interface GithubStatus {
   connectedAt: string | null;
 }
 
-// ── Helper: resolve the best display name from Clerk ────────────
+// ── Name resolution ──────────────────────────────────────────────
 function resolveDisplayName(user: ReturnType<typeof useUser>['user'], profile?: UserProfile): string {
   if (!user) return 'Developer';
   if (user.firstName && !user.firstName.includes('@')) {
@@ -47,31 +50,15 @@ function getInitials(name: string): string {
   return (name[0] ?? 'D').toUpperCase();
 }
 
-// ── Icons ───────────────────────────────────────────────────────
-function GithubIcon({ size = 24 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.157-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"
-        fill="#0F172A"
-      />
-    </Svg>
-  );
-}
+function SyncIconComp() { return <SyncIcon size={18} color="#FFFFFF" />; }
+function SignOutIconComp() { return <LogOutIcon size={18} color="#EF4444" />; }
 
-function SignOutIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-      <Path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="#EF4444" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
-// ── Main Screen ──────────────────────────────────────────────────
+// ── Main ────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { state: githubState, connect, disconnect } = useGithubConnect();
 
   const { data: profile } = useQuery({
@@ -82,13 +69,36 @@ export default function ProfileScreen() {
     },
   });
 
-  const { data: githubStatus, isLoading: githubLoading } = useQuery({
+  const { data: githubStatus, isLoading: githubLoading, refetch: refetchGithub } = useQuery({
     queryKey: ['github-status'],
     queryFn: async () => {
       const res = await apiClient.get<GithubStatus>('/api/v1/github/status');
       return res.data;
     },
   });
+
+  // Sync mutation — triggers full GitHub sync then refreshes all dashboard queries
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.post<{ message: string; traceId: string }>('/api/v1/github/sync');
+      return res.data;
+    },
+    onSuccess: async () => {
+      // Wait 3 s for the sync to process, then invalidate all data
+      await new Promise((r) => setTimeout(r, 3000));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['analytics-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['github-status'] }),
+      ]);
+      Alert.alert('Sync Complete', 'Your GitHub data has been synced. Check the Dashboard!');
+    },
+    onError: (err) => {
+      Alert.alert('Sync Failed', err instanceof Error ? err.message : 'Could not sync GitHub data');
+    },
+  });
+
+
 
   const displayName = resolveDisplayName(user, profile);
   const initials = getInitials(displayName);
@@ -100,10 +110,7 @@ export default function ProfileScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out', style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/(auth)/sign-in');
-        },
+        onPress: async () => { await signOut(); router.replace('/(auth)/sign-in'); },
       },
     ]);
   };
@@ -129,7 +136,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Avatar section */}
+        {/* Avatar */}
         <View style={styles.avatarSection}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
@@ -139,22 +146,31 @@ export default function ProfileScreen() {
             </View>
           )}
           <Text style={styles.displayName}>{displayName}</Text>
-          <Text style={styles.email}>{profile?.email ?? user?.emailAddresses?.[0]?.emailAddress ?? ''}</Text>
+          <Text style={styles.email}>
+            {profile?.email ?? user?.emailAddresses?.[0]?.emailAddress ?? ''}
+          </Text>
           <View style={[styles.planBadge, { backgroundColor: planStyle.bg }]}>
             <Text style={[styles.planText, { color: planStyle.text }]}>{profile?.plan ?? 'FREE'} Plan</Text>
           </View>
         </View>
 
-        {/* Info */}
+        {/* Account info */}
         <Text style={styles.sectionHeading}>Account</Text>
         <View style={styles.infoCard}>
           <InfoRow label="Username" value={profile?.username ?? user?.username ?? '—'} />
-          <InfoRow label="Member Since" value={profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' }) : '—'} />
+          <InfoRow
+            label="Member Since"
+            value={profile?.createdAt
+              ? new Date(profile.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' })
+              : '—'}
+          />
           <InfoRow label="Public Profile" value={profile?.profile?.isPublic ? 'Enabled' : 'Disabled'} last />
         </View>
 
-        {/* Integrations */}
-        <Text style={styles.sectionHeading}>Integrations</Text>
+        {/* GitHub Integration */}
+        <Text style={styles.sectionHeading}>GitHub Integration</Text>
+
+        {/* Connect / Disconnect */}
         <TouchableOpacity
           style={[styles.integrationCard, githubStatus?.connected && styles.integrationConnected]}
           onPress={handleGithubAction}
@@ -163,39 +179,78 @@ export default function ProfileScreen() {
         >
           <GithubIcon size={28} />
           <View style={styles.integrationInfo}>
-            <Text style={styles.integrationName}>GitHub</Text>
+            <Text style={styles.integrationName}>GitHub Account</Text>
             {githubLoading ? (
-              <Text style={styles.integrationSub}>Checking connection…</Text>
+              <Text style={styles.integrationSub}>Checking…</Text>
             ) : githubStatus?.connected ? (
-              <Text style={styles.integrationConnectedText}>@{githubStatus.login} · Connected</Text>
+              <Text style={styles.integrationConnectedText}>
+                @{githubStatus.login} · Tap to disconnect
+              </Text>
             ) : (
-              <Text style={styles.integrationSub}>Tap to sync commits & repos</Text>
+              <Text style={styles.integrationSub}>Connect to sync commits & repos</Text>
             )}
           </View>
           {isConnecting ? (
             <ActivityIndicator color="#6C63FF" size="small" />
           ) : githubStatus?.connected ? (
-            <View style={styles.connectedBadge}><Text style={styles.connectedText}>✓</Text></View>
+            <View style={styles.connectedBadge}><CheckIcon size={16} color="#059669" /></View>
           ) : (
-            <Text style={styles.chevron}>›</Text>
+            <LinkIcon size={18} color="#CBD5E1" />
           )}
         </TouchableOpacity>
 
         {/* GitHub state banners */}
         {githubState.status === 'error' && (
           <View style={styles.errorBanner}>
-            <Text style={styles.bannerText}>⚠ {githubState.message}</Text>
+            <AlertTriangleIcon size={14} color="#EF4444" />
+            <Text style={[styles.bannerText, { marginLeft: 6 }]}>{githubState.message}</Text>
           </View>
         )}
         {githubState.status === 'success' && (
           <View style={styles.successBanner}>
-            <Text style={[styles.bannerText, { color: '#059669' }]}>✓ Connected as @{githubState.login}</Text>
+            <CheckIcon size={14} color="#059669" />
+            <Text style={[styles.bannerText, { color: '#059669', marginLeft: 6 }]}>
+              Connected as @{githubState.login} — now sync below
+            </Text>
           </View>
         )}
 
+        {/* ── SYNC NOW button — the KEY feature ── */}
+        {githubStatus?.connected && (
+          <TouchableOpacity
+            style={[styles.syncButton, syncMutation.isPending && styles.syncButtonDisabled]}
+            onPress={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            activeOpacity={0.85}
+          >
+            {syncMutation.isPending ? (
+              <>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text style={styles.syncButtonText}>Syncing your GitHub data…</Text>
+              </>
+            ) : (
+              <>  
+                <SyncIconComp />
+                <Text style={styles.syncButtonText}>Sync GitHub Data Now</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {syncMutation.isSuccess && (
+          <View style={[styles.successBanner, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+            <CheckIcon size={14} color="#059669" />
+            <Text style={[styles.bannerText, { color: '#059669' }]}>
+              Sync complete — dashboard is now live!
+            </Text>
+          </View>
+        )}
+
+
+
         {/* Sign out */}
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} activeOpacity={0.8}>
-          <SignOutIcon />
+          <SignOutIconComp />
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
 
@@ -231,7 +286,7 @@ const styles = StyleSheet.create({
 
   sectionHeading: {
     fontSize: 18, fontFamily: 'TurboDriverItalic', color: '#0F172A',
-    marginBottom: 12, marginTop: 24,
+    marginBottom: 12, marginTop: 28,
   },
 
   infoCard: {
@@ -247,9 +302,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18,
     borderWidth: 1, borderColor: '#F1F5F9',
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  integrationConnected: { borderColor: '#D2ECE6' },
+  integrationConnected: { borderColor: '#D2ECE6', backgroundColor: '#FAFFFE' },
   integrationInfo: { flex: 1 },
   integrationName: { color: '#0F172A', fontSize: 16, fontWeight: '700' },
   integrationSub: { color: '#94A3B8', fontSize: 13, marginTop: 2 },
@@ -260,6 +316,51 @@ const styles = StyleSheet.create({
   },
   connectedText: { color: '#059669', fontSize: 14, fontWeight: '700' },
   chevron: { color: '#CBD5E1', fontSize: 22 },
+
+  // ── Sync button ──────────────────────────────────────────────
+  syncButton: {
+    marginTop: 14, backgroundColor: '#0F172A', borderRadius: 20,
+    paddingVertical: 18, paddingHorizontal: 24,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18, shadowRadius: 12, elevation: 6,
+  },
+  syncButtonDisabled: { opacity: 0.6 },
+  syncButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+
+  // ── Dev options ──────────────────────────────────────────────
+  devSection: {
+    marginTop: 28,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  devSectionHeading: {
+    fontSize: 16,
+    fontFamily: 'TurboDriverItalic',
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  devSyncButton: {
+    backgroundColor: '#6366F1',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  devSyncButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 
   errorBanner: {
     marginTop: 10, backgroundColor: '#FEF2F2', borderRadius: 14,
@@ -272,7 +373,7 @@ const styles = StyleSheet.create({
   bannerText: { color: '#EF4444', fontSize: 13, fontWeight: '500' },
 
   signOutButton: {
-    marginTop: 32, backgroundColor: '#FEF2F2', borderRadius: 18,
+    marginTop: 36, backgroundColor: '#FEF2F2', borderRadius: 18,
     paddingVertical: 18, alignItems: 'center',
     borderWidth: 1, borderColor: '#FCA5A5',
     flexDirection: 'row', justifyContent: 'center', gap: 10,

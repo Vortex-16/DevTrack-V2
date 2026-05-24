@@ -3,32 +3,31 @@ import { ConfigService } from '@nestjs/config';
 import { AIProvider, AIOptions, AIResult } from './ai-provider.interface';
 
 /**
- * NVIDIA NIM provider — primary AI provider.
- * Uses OpenAI-compatible REST API with llama-3.1-70b-instruct.
- * Max free tokens: check https://build.nvidia.com/nim for current limits.
+ * Groq provider — high speed inference provider.
+ * Uses OpenAI-compatible REST API.
  */
 @Injectable()
-export class NvidiaNimProvider implements AIProvider {
-  readonly name = 'nvidia-nim';
+export class GroqProvider implements AIProvider {
+  readonly name = 'groq';
   readonly model: string;
   private readonly apiKey: string;
   private readonly baseUrl: string;
-  private readonly logger = new Logger(NvidiaNimProvider.name);
+  private readonly logger = new Logger(GroqProvider.name);
 
   constructor(private readonly config: ConfigService) {
-    this.apiKey = (this.config.get<string>('NVIDIA_NIM_API_KEY') ?? '').replace(/^["']|["']$/g, '');
+    this.apiKey = (this.config.get<string>('GROQ_API_KEY') ?? '').replace(/^["']|["']$/g, '');
     this.baseUrl = (
-      this.config.get<string>('NVIDIA_NIM_BASE_URL') ??
-      'https://integrate.api.nvidia.com/v1'
+      this.config.get<string>('GROQ_BASE_URL') ??
+      'https://api.groq.com/openai/v1'
     ).replace(/^["']|["']$/g, '');
     this.model = (
-      this.config.get<string>('NVIDIA_NIM_MODEL') ??
-      'meta/llama-3.1-70b-instruct'
+      this.config.get<string>('GROQ_MODEL') ??
+      'llama3-8b-8192'
     ).replace(/^["']|["']$/g, '');
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!this.apiKey && this.apiKey !== 'nvapi-...';
+    return !!this.apiKey && this.apiKey !== 'gsk_...';
   }
 
   async complete(prompt: string, options: AIOptions = {}): Promise<AIResult> {
@@ -60,7 +59,7 @@ export class NvidiaNimProvider implements AIProvider {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`NVIDIA NIM error ${response.status}: ${text}`);
+      throw new Error(`Groq error ${response.status}: ${text}`);
     }
 
     const data = (await response.json()) as {
@@ -72,7 +71,7 @@ export class NvidiaNimProvider implements AIProvider {
     const latencyMs = Date.now() - start;
 
     this.logger.debug({
-      msg: 'NVIDIA NIM completion',
+      msg: 'Groq completion',
       model: this.model,
       tokensUsed: data.usage?.total_tokens,
       latencyMs,
