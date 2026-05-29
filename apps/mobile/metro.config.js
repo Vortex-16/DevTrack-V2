@@ -19,4 +19,7 @@ config.resolver.nodeModulesPaths = [
 // Resolve workspace package symlinks correctly
 config.resolver.disableHierarchicalLookup = true;
 
+// Add webm support for local video assets
+config.resolver.assetExts.push('webm');
+
 module.exports = config;

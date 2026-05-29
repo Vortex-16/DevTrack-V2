@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Image,
   Dimensions,
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { useSignUp, useOAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -54,12 +54,17 @@ export default function SignUpScreen() {
           <Text style={styles.tagline}>Developer Workflow Intelligence</Text>
         </View>
 
-        {/* Decorative loving illustrations featuring the DevTrack Mascot */}
+        {/* Interactive video introduction featuring the DevTrack Workspace */}
         <View style={styles.imageContainer}>
-          <Image
-            source={require('../../assets/images/DevTrack Mascot.png')}
+          <Video
+            source={require('../../assets/video/DevTrack NewUser.mp4')}
             style={styles.illustration}
-            resizeMode="contain"
+            videoStyle={{ width: '100%', height: '100%' }}
+            resizeMode={ResizeMode.CONTAIN}
+            shouldPlay
+            isLooping
+            isMuted={false}
+            onError={(err) => console.log('Video Playback Error:', err)}
           />
         </View>
 
@@ -97,7 +102,7 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0F',
+    backgroundColor: '#000000',
   },
   inner: {
     flex: 1,
@@ -127,13 +132,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    maxHeight: 320,
+    maxHeight: 420,
     marginVertical: 20,
   },
   illustration: {
-    width: width - 56,
-    height: '100%',
-    borderRadius: 24,
+    width: width - 16,
+    height: 380,
+    borderRadius: 16,
   },
   ctaContainer: {
     width: '100%',
