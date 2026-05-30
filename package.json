@@ -10,7 +10,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
-    "db:studio": "turbo run db:studio"
+    "db:studio": "turbo run db:studio",
+    "test:api": "node dev/test-api.js"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

@@ -62,6 +62,31 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Trace-Id'],
   });
 
+  // ── HTTP security headers (Helmet) ───────────────────────────
+  try {
+    // Use runtime require so CI/dev machines without the package can still run typecheck
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const helmet = require('helmet') as any;
+    app.use(
+      helmet({
+        // Basic CSP tailored for API responses; frontend CSP is managed by the web app
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            connectSrc: [process.env.FRONTEND_URL ?? 'http://localhost:3000'],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            imgSrc: ["'self'", 'data:'],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+          },
+        },
+      }),
+    );
+  } catch (e) {
+    // Helmet not installed — skip middleware (dev environments may omit it)
+  }
+
   const port = parseInt(process.env.PORT ?? '3001', 10);
   await app.listen(port, '0.0.0.0');
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { NvidiaNimProvider } from './providers/nvidia-nim.provider';
 import { GroqProvider } from './providers/groq.provider';
@@ -6,6 +6,7 @@ import { GeminiProvider } from './providers/gemini.provider';
 import { MockProvider } from './providers/mock.provider';
 import { AIOptions, AIResult } from './providers/ai-provider.interface';
 import { ConfigService } from '@nestjs/config';
+import { buildRepoAnalysisPrompt } from './prompts/v1/repo-analysis.prompt';
 
 /**
  * AiService — orchestrates the provider fallback chain.
@@ -60,6 +61,51 @@ export class AiService {
     });
 
     return result;
+  }
+
+  /**
+   * Fetch a single AIInsight owned by `userId` or throw NotFound.
+   */
+  async getInsightOwned(userId: string, id: string) {
+    const insight = await this.prisma.aIInsight.findFirst({ where: { id, userId } });
+    if (!insight) throw new NotFoundException('Insight not found');
+    return insight;
+  }
+
+  /**
+   * Delete an AIInsight owned by `userId` or throw NotFound.
+   */
+  async deleteInsightOwned(userId: string, id: string) {
+    const insight = await this.prisma.aIInsight.findFirst({ where: { id, userId } });
+    if (!insight) throw new NotFoundException('Insight not found');
+    await this.prisma.aIInsight.delete({ where: { id } });
+    return { deleted: true };
+  }
+
+  /**
+   * Run a repo analysis for a repository owned by `userId`.
+   * Centralizes ownership check and upserts the summary.
+   */
+  async runRepoAnalysisOwned(userId: string, repositoryId: string) {
+    const repo = await this.prisma.repository.findFirst({ where: { id: repositoryId, userId } });
+    if (!repo) throw new NotFoundException('Repository not found');
+
+    const [commits7d, commits30d] = await Promise.all([
+      this.prisma.commit.count({ where: { repositoryId: repo.id, committedAt: { gte: new Date(Date.now() - 7 * 86400_000) } } }),
+      this.prisma.commit.count({ where: { repositoryId: repo.id, committedAt: { gte: new Date(Date.now() - 30 * 86400_000) } } }),
+    ]);
+
+    const prompt = buildRepoAnalysisPrompt({ commits7d, commits30d, topLanguage: repo.language ?? 'various' });
+
+    const result = await this.complete(userId, prompt, { maxTokens: 512 });
+
+    await this.prisma.repoAnalysis.upsert({
+      where: { repositoryId: repo.id },
+      create: { repositoryId: repo.id, summary: result.text, languages: {} },
+      update: { summary: result.text, analyzedAt: new Date() },
+    });
+
+    return { summary: result.text, provider: result.provider, model: result.model };
   }
 
   /**

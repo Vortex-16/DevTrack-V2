@@ -231,9 +231,9 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | `StreakComputeJob` | [✓] Done | |
 | BullMQ upgrade comment in every job | [✓] Done | |
 | `InsightGenJob` — weekly AI insights | [✓] Done | `@Cron('0 4 * * 1')` |
-| `GraphComputeJob` (V2.1) | [ ] Not Started | DeveloperGraph |
-| `DnaAnalysisJob` (V2.1) | [ ] Not Started | ProjectDNA |
-| `MomentumScanJob` (V2.1) | [ ] Not Started | Burnout detection |
+| `GraphComputeJob` (V2.1) | [✓] Done | DeveloperGraph — weekly snapshot job implemented |
+| `DnaAnalysisJob` (V2.1) | [✓] Done | ProjectDNA — nightly fingerprint job implemented |
+| `MomentumScanJob` (V2.1) | [✓] Done | Burnout detection — daily momentum scanner implemented |
 
 ### Phase 2.8 — Projects Module [✓] COMPLETE
 | Task | Status | Notes |
@@ -261,10 +261,10 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | Task | Status | Notes |
 |------|--------|-------|
 | `intelligence/` module scaffold | [ ] Not Started | |
-| `DeveloperGraph` — 10-dimension score | [ ] Not Started | Schema additions ready in arch doc |
-| `ProjectDNA` — repo architectural fingerprint | [ ] Not Started | |
+| `DeveloperGraph` — 10-dimension score | [~] Partial | Basic DeveloperGraph snapshots + job implemented (V2.1) |
+| `ProjectDNA` — repo architectural fingerprint | [~] Partial | ProjectDNA job scaffold + nightly fingerprinting implemented |
 | `BuildMemory` — personal engineering archive | [ ] Not Started | |
-| `MomentumSignal` — burnout / velocity detection | [ ] Not Started | |
+| `MomentumSignal` — burnout / velocity detection | [~] Partial | MomentumScan job persists basic momentum signals |
 | `SkillConfidence` — evidence-based skills | [ ] Not Started | |
 | `DeveloperReputation` — credibility score | [ ] Not Started | |
 | `CoachSession` — AI Engineering Coach | [ ] Not Started | |
@@ -291,7 +291,7 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | Plan-based access guard (`PlansGuard`) | [✓] Done | |
 | `@RequirePlans()` decorator | [✓] Done | |
 | RBAC permissions matrix (Participant/Organizer/Judge/Admin) | [ ] Not Started | Arch 2.0.2 requirement |
-| `@Roles()` guard | [ ] Not Started | |
+| `@Roles()` guard | [✓] Done | `Roles` decorator + `RolesGuard` added (apply more widely) |
 | Resource ownership checks (user can't access other user's data) | [~] Partial | Some controllers — not consistent |
 
 ### Phase 3.3 — Encryption & Token Security
@@ -321,10 +321,10 @@ Configure these on Vercel to allow the Next.js web application to connect:
 ### Phase 3.6 — Webhook Security (V2.2)
 | Task | Status | Notes |
 |------|--------|-------|
-| HMAC-SHA256 signature verification | [ ] Not Started | Arch 2.0.2 requirement |
-| `crypto.timingSafeEqual` for constant-time compare | [ ] Not Started | |
-| Replay protection (delivery ID dedup in Redis) | [ ] Not Started | |
-| Timestamp validation (reject > 5min old) | [ ] Not Started | |
+| HMAC-SHA256 signature verification | [✓] Done | Webhook signature verification implemented |
+| `crypto.timingSafeEqual` for constant-time compare | [✓] Done | Timing-safe compare used in handler |
+| Replay protection (delivery ID dedup in Redis) | [✓] Done | Optional Redis dedupe implemented with short TTL |
+| Timestamp validation (reject > 5min old) | [✓] Done | Webhook timestamp validation added |
 | Webhook rate limiting (100 req/min per IP) | [ ] Not Started | |
 
 ### Phase 3.7 — Audit & Observability

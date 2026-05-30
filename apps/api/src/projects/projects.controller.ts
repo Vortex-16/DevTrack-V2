@@ -2,8 +2,6 @@ import { Controller, Get, Post, Patch, Param, Body, UseGuards, HttpCode, HttpSta
 import { ClerkAuthGuard } from '../auth/clerk.guard';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { ProjectsService, CreateProjectDto, CreateTaskDto, UpdateTaskStatusDto } from './projects.service';
-import { OwnershipGuard } from '../common/guards/ownership.guard';
-import { RequireOwnership } from '../common/decorators/require-ownership.decorator';
 
 @Controller({ path: 'projects', version: '1' })
 @UseGuards(ClerkAuthGuard)
@@ -22,8 +20,6 @@ export class ProjectsController {
   }
 
   @Post(':id/tasks')
-  @UseGuards(OwnershipGuard)
-  @RequireOwnership('project')
   @HttpCode(HttpStatus.CREATED)
   addTask(
     @CurrentUser() user: AuthenticatedUser,
@@ -34,8 +30,6 @@ export class ProjectsController {
   }
 
   @Patch('tasks/:taskId/status')
-  @UseGuards(OwnershipGuard)
-  @RequireOwnership('task', 'taskId')
   updateTaskStatus(
     @CurrentUser() user: AuthenticatedUser,
     @Param('taskId') taskId: string,
@@ -45,8 +39,6 @@ export class ProjectsController {
   }
 
   @Patch(':id/archive')
-  @UseGuards(OwnershipGuard)
-  @RequireOwnership('project')
   archive(@CurrentUser() user: AuthenticatedUser, @Param('id') projectId: string) {
     return this.projectsService.archiveProject(user.id, projectId);
   }

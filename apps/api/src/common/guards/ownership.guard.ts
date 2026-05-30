@@ -32,14 +32,16 @@ export class OwnershipGuard implements CanActivate {
         return true;
       }
 
-      const record = await model.findUnique({ where: { id } });
-      if (!record) return false;
-      if (record.userId && record.userId === user.id) return true;
+      // Prefer findFirst with userId to avoid accidental leakage via findUnique
+      const owned = await model.findFirst({ where: { id, userId: user.id } });
+      if (owned) return true;
 
-      // If record contains repositoryId, check repository ownership
+      // Fallback: load minimal record to check repository ownership
+      const record = await model.findUnique({ where: { id }, select: { repositoryId: true } as any });
+      if (!record) return false;
       if (record.repositoryId) {
-        const repo = await this.prisma.repository.findUnique({ where: { id: record.repositoryId } });
-        if (repo?.userId === user.id) return true;
+        const repo = await this.prisma.repository.findFirst({ where: { id: record.repositoryId, userId: user.id } });
+        if (repo) return true;
       }
 
       throw new ForbiddenException();

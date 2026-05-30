@@ -9,8 +9,6 @@ import { Type } from 'class-transformer';
 import { buildAssistantSystemPrompt } from './prompts/v1/assistant.prompt';
 import { buildGrowthInsightPrompt, GROWTH_INSIGHT_SYSTEM_PROMPT } from './prompts/v1/growth-insight.prompt';
 import { buildRepoAnalysisPrompt } from './prompts/v1/repo-analysis.prompt';
-import { OwnershipGuard } from '../common/guards/ownership.guard';
-import { RequireOwnership } from '../common/decorators/require-ownership.decorator';
 
 class AiCompleteDto {
   @IsString()
@@ -137,10 +135,7 @@ export class AiController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
-    const insight = await this.prisma.aIInsight.findUnique({ where: { id } });
-    if (!insight) throw new NotFoundException('Insight not found');
-    if (insight.userId !== user.id) throw new ForbiddenException();
-    return insight;
+    return this.aiService.getInsightOwned(user.id, id);
   }
 
   /**
@@ -152,11 +147,7 @@ export class AiController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
-    const insight = await this.prisma.aIInsight.findUnique({ where: { id } });
-    if (!insight) throw new NotFoundException('Insight not found');
-    if (insight.userId !== user.id) throw new ForbiddenException();
-    await this.prisma.aIInsight.delete({ where: { id } });
-    return { deleted: true };
+    return this.aiService.deleteInsightOwned(user.id, id);
   }
 
   /**
@@ -211,40 +202,11 @@ export class AiController {
    * Run a repo analysis using the extracted prompt for a specific repository.
    */
   @Post('repo-analysis')
-  @UseGuards(OwnershipGuard)
-  @RequireOwnership('repository', 'repositoryId')
   async runRepoAnalysis(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: RepoAnalysisDto,
   ) {
-    const repo = await this.prisma.repository.findUnique({ where: { id: dto.repositoryId } });
-    if (!repo) throw new NotFoundException('Repository not found');
-    if (repo.userId !== user.id) throw new ForbiddenException();
-
-    const [commits7d, commits30d] = await Promise.all([
-      this.prisma.commit.count({ where: { repositoryId: repo.id, committedAt: { gte: new Date(Date.now() - 7 * 86400_000) } } }),
-      this.prisma.commit.count({ where: { repositoryId: repo.id, committedAt: { gte: new Date(Date.now() - 30 * 86400_000) } } }),
-    ]);
-
-    const prompt = buildRepoAnalysisPrompt({ commits7d, commits30d, topLanguage: repo.language ?? 'various' });
-
-    const result = await this.aiService.complete(user.id, prompt, { maxTokens: 512 });
-
-    // Upsert a RepoAnalysis summary record
-    await this.prisma.repoAnalysis.upsert({
-      where: { repositoryId: repo.id },
-      create: {
-        repositoryId: repo.id,
-        summary: result.text,
-        languages: {},
-      },
-      update: {
-        summary: result.text,
-        analyzedAt: new Date(),
-      },
-    });
-
-    return { summary: result.text, provider: result.provider, model: result.model };
+    return this.aiService.runRepoAnalysisOwned(user.id, dto.repositoryId);
   }
 
   /**

@@ -24,6 +24,24 @@ export class UpdateTaskStatusDto {
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Returns a project owned by `userId` or throws `NotFoundException`.
+   */
+  async findOwnedProject(projectId: string, userId: string) {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, userId, deletedAt: null } });
+    if (!project) throw new NotFoundException('Project not found');
+    return project;
+  }
+
+  /**
+   * Returns a task owned by `userId` (via its project) or throws `NotFoundException`.
+   */
+  async findOwnedTask(taskId: string, userId: string) {
+    const task = await this.prisma.task.findFirst({ where: { id: taskId, project: { userId } } });
+    if (!task) throw new NotFoundException('Task not found');
+    return task;
+  }
+
   async listProjects(userId: string) {
     return this.prisma.project.findMany({
       where: { userId, deletedAt: null },
@@ -51,11 +69,8 @@ export class ProjectsService {
   }
 
   async addTask(userId: string, projectId: string, dto: CreateTaskDto) {
-    // Verify ownership
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, userId, deletedAt: null },
-    });
-    if (!project) throw new NotFoundException('Project not found');
+    // Verify ownership via centralized helper
+    const project = await this.findOwnedProject(projectId, userId);
 
     return this.prisma.task.create({
       data: {
@@ -69,11 +84,8 @@ export class ProjectsService {
   }
 
   async updateTaskStatus(userId: string, taskId: string, dto: UpdateTaskStatusDto) {
-    // Join through project to verify ownership
-    const task = await this.prisma.task.findFirst({
-      where: { id: taskId, project: { userId } },
-    });
-    if (!task) throw new NotFoundException('Task not found');
+    // Verify ownership via centralized helper (ensures project ownership)
+    const task = await this.findOwnedTask(taskId, userId);
 
     return this.prisma.task.update({
       where: { id: taskId },
@@ -85,14 +97,8 @@ export class ProjectsService {
   }
 
   async archiveProject(userId: string, projectId: string) {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, userId, deletedAt: null },
-    });
-    if (!project) throw new NotFoundException('Project not found');
+    await this.findOwnedProject(projectId, userId);
 
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: { status: ProjectStatus.ARCHIVED, deletedAt: new Date() },
-    });
+    return this.prisma.project.update({ where: { id: projectId }, data: { status: ProjectStatus.ARCHIVED, deletedAt: new Date() } });
   }
 }

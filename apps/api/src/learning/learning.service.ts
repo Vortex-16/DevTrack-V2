@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { IsString, IsOptional, IsInt, Min, Max, MaxLength, IsArray, IsUrl } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -56,5 +56,14 @@ export class LearningService {
       _sum: { duration: true },
     });
     return result._sum.duration ?? 0;
+  }
+
+  /**
+   * Return a learning log owned by `userId` or throw `NotFoundException`.
+   */
+  async findOwnedLearningLog(id: string, userId: string) {
+    const log = await this.prisma.learningLog.findFirst({ where: { id, userId } });
+    if (!log) throw new NotFoundException('Learning log not found');
+    return log;
   }
 }

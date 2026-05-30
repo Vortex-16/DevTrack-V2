@@ -1,0 +1,107 @@
+@baseUrl = http://localhost:3001
+@clerkToken = PASTE_YOUR_CLERK_JWT_HERE
+@projectId = PASTE_PROJECT_ID_HERE
+
+### Health Check (v1)
+GET {{baseUrl}}/api/v1/health
+
+### Test — No Token (should 401)
+GET {{baseUrl}}/api/v1/users/me
+
+### Test — Bad Token (should 401)
+GET {{baseUrl}}/api/v1/users/me
+Authorization: Bearer this.is.not.valid
+
+### Get Current User (Me)
+GET {{baseUrl}}/api/v1/users/me
+Authorization: Bearer {{clerkToken}}
+
+### Update Profile
+PATCH {{baseUrl}}/api/v1/users/me/profile
+Authorization: Bearer {{clerkToken}}
+Content-Type: application/json
+
+{
+  "bio": "Full-stack developer building cool things",
+  "location": "Mumbai, India",
+  "website": "https://example.com",
+  "isPublic": true
+}
+
+### List Projects
+GET {{baseUrl}}/api/v1/projects
+Authorization: Bearer {{clerkToken}}
+
+### Create Project
+# Use the returned "id" in the @projectId variable above
+POST {{baseUrl}}/api/v1/projects
+Authorization: Bearer {{clerkToken}}
+Content-Type: application/json
+
+{
+  "name": "DevTrack V2",
+  "description": "Engineering growth OS",
+  "deadline": "2026-08-01T00:00:00Z"
+}
+
+### Create Task
+POST {{baseUrl}}/api/v1/projects/{{projectId}}/tasks
+Authorization: Bearer {{clerkToken}}
+Content-Type: application/json
+
+{
+  "title": "Build GitHub sync pipeline",
+  "priority": "HIGH",
+  "dueDate": "2026-06-15T00:00:00Z"
+}
+
+### Archive Project (Soft Delete)
+PATCH {{baseUrl}}/api/v1/projects/{{projectId}}/archive
+Authorization: Bearer {{clerkToken}}
+
+### List Repositories
+GET {{baseUrl}}/api/v1/github/repositories
+Authorization: Bearer {{clerkToken}}
+
+### Get Sync Status
+GET {{baseUrl}}/api/v1/github/status
+Authorization: Bearer {{clerkToken}}
+
+### Get Current Streak
+GET {{baseUrl}}/api/v1/analytics/streak
+Authorization: Bearer {{clerkToken}}
+
+### Get Analytics Summary
+GET {{baseUrl}}/api/v1/analytics/summary
+Authorization: Bearer {{clerkToken}}
+
+### Get Language Breakdown
+GET {{baseUrl}}/api/v1/analytics/languages
+Authorization: Bearer {{clerkToken}}
+
+### Create Learning Log
+POST {{baseUrl}}/api/v1/learning
+Authorization: Bearer {{clerkToken}}
+Content-Type: application/json
+
+{
+  "topic": "NestJS EventEmitter2",
+  "notes": "Learned how to use wildcard events for domain-driven design",
+  "source": "https://docs.nestjs.com/techniques/events",
+  "tags": ["nestjs", "backend", "events"],
+  "duration": 90
+}
+
+### List Learning Logs
+GET {{baseUrl}}/api/v1/learning
+Authorization: Bearer {{clerkToken}}
+
+### AI Complete (Growth Insight)
+POST {{baseUrl}}/api/v1/ai/complete
+Authorization: Bearer {{clerkToken}}
+Content-Type: application/json
+
+{
+  "prompt": "I have made 42 commits in the last 7 days, mostly in TypeScript. Give me one specific, actionable growth insight in 3 sentences.",
+  "maxTokens": 256
+}

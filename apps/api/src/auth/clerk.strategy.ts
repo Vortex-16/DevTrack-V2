@@ -56,7 +56,7 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk-jwt') {
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false,
+      ignoreExpiration: configService.get<string>('NODE_ENV') === 'development',
       // jwks-rsa: fetches public key by kid, caches for 10min, rate-limited
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
