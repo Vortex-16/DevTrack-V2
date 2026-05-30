@@ -1,0 +1,378 @@
+{
+  "client": "Thunder Client",
+  "collectionName": "DevTrack V2 API",
+  "dateExported": "2026-05-29",
+  "version": "1.2",
+  "folders": [
+    { "_id": "f-health",    "name": "[Health]",       "containerId": "" },
+    { "_id": "f-auth",      "name": "[Auth]",          "containerId": "" },
+    { "_id": "f-users",     "name": "[Users]",         "containerId": "" },
+    { "_id": "f-github",    "name": "[GitHub]",        "containerId": "" },
+    { "_id": "f-analytics", "name": "[Analytics]",     "containerId": "" },
+    { "_id": "f-projects",  "name": "[Projects]",      "containerId": "" },
+    { "_id": "f-learning",  "name": "[Learning]",      "containerId": "" },
+    { "_id": "f-ai",        "name": "[AI]",            "containerId": "" }
+  ],
+  "requests": [
+
+    {
+      "_id": "r-health-check",
+      "colId": "",
+      "containerId": "f-health",
+      "name": "Health Check",
+      "url": "{{baseUrl}}/health",
+      "method": "GET",
+      "headers": [],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-users-me",
+      "colId": "",
+      "containerId": "f-users",
+      "name": "Get Current User (Me)",
+      "url": "{{baseUrl}}/api/v1/users/me",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "X-Trace-Id",    "value": "thunderclient-test-001" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-users-update-profile",
+      "colId": "",
+      "containerId": "f-users",
+      "name": "Update Profile",
+      "url": "{{baseUrl}}/api/v1/users/profile",
+      "method": "PATCH",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"bio\": \"Full-stack developer building cool things\",\n  \"location\": \"Mumbai, India\",\n  \"website\": \"https://example.com\",\n  \"isPublic\": true\n}"
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-github-repos",
+      "colId": "",
+      "containerId": "f-github",
+      "name": "List Repositories",
+      "url": "{{baseUrl}}/api/v1/github/repos",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-github-sync",
+      "colId": "",
+      "containerId": "f-github",
+      "name": "Trigger Manual Sync",
+      "url": "{{baseUrl}}/api/v1/github/sync",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "X-Trace-Id",    "value": "thunderclient-manual-sync" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "202" }
+      ]
+    },
+
+    {
+      "_id": "r-github-sync-status",
+      "colId": "",
+      "containerId": "f-github",
+      "name": "Get Sync Status",
+      "url": "{{baseUrl}}/api/v1/github/sync/status",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-analytics-streak",
+      "colId": "",
+      "containerId": "f-analytics",
+      "name": "Get Current Streak",
+      "url": "{{baseUrl}}/api/v1/analytics/streak",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-analytics-summary",
+      "colId": "",
+      "containerId": "f-analytics",
+      "name": "Get Analytics Summary",
+      "url": "{{baseUrl}}/api/v1/analytics/summary",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-projects-list",
+      "colId": "",
+      "containerId": "f-projects",
+      "name": "List Projects",
+      "url": "{{baseUrl}}/api/v1/projects",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-projects-create",
+      "colId": "",
+      "containerId": "f-projects",
+      "name": "Create Project",
+      "url": "{{baseUrl}}/api/v1/projects",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"name\": \"DevTrack V2\",\n  \"description\": \"Engineering growth OS\",\n  \"status\": \"ACTIVE\",\n  \"deadline\": \"2026-08-01T00:00:00Z\"\n}"
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "201" }
+      ]
+    },
+
+    {
+      "_id": "r-projects-update",
+      "colId": "",
+      "containerId": "f-projects",
+      "name": "Update Project",
+      "url": "{{baseUrl}}/api/v1/projects/{{projectId}}",
+      "method": "PATCH",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"PAUSED\"\n}"
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-projects-delete",
+      "colId": "",
+      "containerId": "f-projects",
+      "name": "Delete Project (Soft)",
+      "url": "{{baseUrl}}/api/v1/projects/{{projectId}}",
+      "method": "DELETE",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-tasks-create",
+      "colId": "",
+      "containerId": "f-projects",
+      "name": "Create Task",
+      "url": "{{baseUrl}}/api/v1/projects/{{projectId}}/tasks",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"title\": \"Build GitHub sync pipeline\",\n  \"status\": \"IN_PROGRESS\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2026-06-15T00:00:00Z\"\n}"
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "201" }
+      ]
+    },
+
+    {
+      "_id": "r-learning-create",
+      "colId": "",
+      "containerId": "f-learning",
+      "name": "Create Learning Log",
+      "url": "{{baseUrl}}/api/v1/learning",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"topic\": \"NestJS EventEmitter2\",\n  \"notes\": \"Learned how to use wildcard events for domain-driven design\",\n  \"source\": \"https://docs.nestjs.com/techniques/events\",\n  \"tags\": [\"nestjs\", \"backend\", \"events\"],\n  \"duration\": 90\n}"
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "201" }
+      ]
+    },
+
+    {
+      "_id": "r-learning-list",
+      "colId": "",
+      "containerId": "f-learning",
+      "name": "List Learning Logs",
+      "url": "{{baseUrl}}/api/v1/learning",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
+      "_id": "r-ai-complete",
+      "colId": "",
+      "containerId": "f-ai",
+      "name": "AI Complete (Growth Insight)",
+      "url": "{{baseUrl}}/api/v1/ai/complete",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"prompt\": \"I have made 42 commits in the last 7 days, mostly in TypeScript. Give me one specific, actionable growth insight in 3 sentences.\",\n  \"maxTokens\": 256\n}"
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "201" }
+      ]
+    },
+
+    {
+      "_id": "r-auth-unauthorized",
+      "colId": "",
+      "containerId": "f-auth",
+      "name": "Test — No Token (should 401)",
+      "url": "{{baseUrl}}/api/v1/users/me",
+      "method": "GET",
+      "headers": [],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "401" }
+      ]
+    },
+
+    {
+      "_id": "r-auth-bad-token",
+      "colId": "",
+      "containerId": "f-auth",
+      "name": "Test — Bad Token (should 401)",
+      "url": "{{baseUrl}}/api/v1/users/me",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer this.is.not.valid" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "401" }
+      ]
+    },
+
+    {
+      "_id": "r-throttle-test",
+      "colId": "",
+      "containerId": "f-auth",
+      "name": "Test — Validation Error (should 400)",
+      "url": "{{baseUrl}}/api/v1/projects",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" },
+        { "name": "Content-Type",  "value": "application/json" }
+      ],
+      "params": [],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"unknownField\": \"this should be rejected by ValidationPipe\"\n}"
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "400" }
+      ]
+    }
+
+  ],
+  "environmentVariables": [
+    {
+      "name": "Local",
+      "data": [
+        { "name": "baseUrl",    "value": "http://localhost:3001", "type": "text" },
+        { "name": "clerkToken", "value": "PASTE_YOUR_CLERK_JWT_HERE", "type": "secret" },
+        { "name": "projectId",  "value": "", "type": "text" }
+      ]
+    }
+  ]
+}

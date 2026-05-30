@@ -1,0 +1,54 @@
+# DevTrack V2 — Local Docker Compose
+# Runs Postgres + Redis locally bound to localhost for security, with auth enabled and resource limits.
+# Usage:
+#   docker compose -f infra/compose/docker-compose.local.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: devtrack_postgres
+    restart: unless-stopped
+    # Bind to localhost only to prevent exposure on local networks
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-devtrack}
+      POSTGRES_USER: ${POSTGRES_USER:-devtrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devtrack}
+    volumes:
+      - devtrack_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devtrack} -d ${POSTGRES_DB:-devtrack}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: devtrack_redis
+    restart: unless-stopped
+    # Bind to localhost only to prevent exposure on local networks
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-devtrack_redis_secure_pass}
+    volumes:
+      - devtrack_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-devtrack_redis_secure_pass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  devtrack_postgres_data:
+  devtrack_redis_data:

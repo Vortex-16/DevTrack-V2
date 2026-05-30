@@ -1,0 +1,77 @@
+# Dockerfile — DevTrack V2 Web (Next.js)
+# For self-hosted or Docker-based deployments.
+# Note: Production default is Vercel (zero-config). Use this only for custom hosting.
+#
+# Build context: repo root (docker build -f infra/docker/Dockerfile.web .)
+#
+# Requires these build args (passed via --build-arg or docker-compose env):
+#   NEXT_PUBLIC_API_URL
+#   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+#   CLERK_SECRET_KEY
+
+# ─── Stage 1: base ────────────────────────────────────────────
+FROM node:22-alpine AS base
+
+RUN corepack enable
+
+WORKDIR /app
+
+# ─── Stage 2: deps ────────────────────────────────────────────
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json              apps/web/
+COPY packages/config/package.json       packages/config/
+COPY packages/shared-types/package.json packages/shared-types/
+
+RUN pnpm install --frozen-lockfile
+
+# ─── Stage 3: build ───────────────────────────────────────────
+FROM base AS build
+
+# Declare build-time args — must be supplied for Next.js to bundle NEXT_PUBLIC_ vars
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG CLERK_SECRET_KEY
+ARG NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+ARG NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+ARG NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+ARG NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV CLERK_SECRET_KEY=$CLERK_SECRET_KEY
+ENV NEXT_PUBLIC_CLERK_SIGN_IN_URL=$NEXT_PUBLIC_CLERK_SIGN_IN_URL
+ENV NEXT_PUBLIC_CLERK_SIGN_UP_URL=$NEXT_PUBLIC_CLERK_SIGN_UP_URL
+ENV NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=$NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL
+ENV NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=$NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+
+COPY . .
+
+# Build packages first, then the Next.js app
+RUN pnpm --filter @devtrack/config build
+RUN pnpm --filter @devtrack/shared-types build
+RUN pnpm --filter @devtrack/web build
+
+# ─── Stage 4: runner ──────────────────────────────────────────
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Use the Next.js standalone output for minimal image size
+# (requires `output: 'standalone'` in next.config.ts)
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static     ./apps/web/.next/static
+COPY --from=build /app/apps/web/public           ./apps/web/public
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
+
+CMD ["node", "apps/web/server.js"]

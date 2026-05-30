@@ -1,0 +1,82 @@
+# Dockerfile — DevTrack V2 API (NestJS)
+# Multi-stage build for a lean production image.
+#
+# Build context: repo root (docker build -f infra/docker/Dockerfile.api .)
+#
+# Stages:
+#   1. base   — shared Node + pnpm setup
+#   2. deps   — install ALL workspace dependencies
+#   3. build  — compile TypeScript via Turborepo
+#   4. runner — minimal production image (no dev deps, no source)
+
+# ─── Stage 1: base ────────────────────────────────────────────
+FROM node:22-alpine AS base
+
+# Enable corepack so the correct pnpm version is used (from packageManager field)
+RUN corepack enable
+
+WORKDIR /app
+
+# ─── Stage 2: deps ────────────────────────────────────────────
+FROM base AS deps
+
+# Copy manifests first for better layer caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json                apps/api/
+COPY apps/web/package.json                apps/web/
+COPY packages/config/package.json         packages/config/
+COPY packages/database/package.json       packages/database/
+COPY packages/shared-types/package.json   packages/shared-types/
+COPY packages/logger/package.json         packages/logger/
+COPY packages/ai-client/package.json      packages/ai-client/
+
+RUN pnpm install --frozen-lockfile
+
+# ─── Stage 3: build ───────────────────────────────────────────
+FROM base AS build
+
+COPY --from=deps /app/node_modules       ./node_modules
+COPY --from=deps /app/apps/api/node_modules       ./apps/api/node_modules
+COPY --from=deps /app/packages/config/node_modules ./packages/config/node_modules
+
+# Copy full source
+COPY . .
+
+# Build only the API and its workspace dependencies
+RUN pnpm --filter @devtrack/api... build
+
+# ─── Stage 4: runner ──────────────────────────────────────────
+FROM node:22-alpine AS runner
+
+RUN corepack enable
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Copy the compiled API bundle and minimal runtime packages
+COPY --from=build /app/apps/api/dist               ./apps/api/dist
+COPY --from=build /app/apps/api/package.json       ./apps/api/package.json
+COPY --from=build /app/packages/config/dist        ./packages/config/dist
+COPY --from=build /app/packages/config/package.json ./packages/config/package.json
+COPY --from=build /app/packages/database/dist      ./packages/database/dist
+COPY --from=build /app/packages/database/package.json ./packages/database/package.json
+COPY --from=build /app/packages/shared-types/dist  ./packages/shared-types/dist
+COPY --from=build /app/packages/shared-types/package.json ./packages/shared-types/package.json
+COPY --from=build /app/packages/logger/dist        ./packages/logger/dist
+COPY --from=build /app/packages/logger/package.json ./packages/logger/package.json
+COPY --from=build /app/packages/ai-client/dist     ./packages/ai-client/dist
+COPY --from=build /app/packages/ai-client/package.json ./packages/ai-client/package.json
+COPY --from=build /app/package.json                ./package.json
+COPY --from=build /app/pnpm-lock.yaml              ./pnpm-lock.yaml
+COPY --from=build /app/pnpm-workspace.yaml         ./pnpm-workspace.yaml
+
+# Install production-only dependencies
+RUN pnpm install --frozen-lockfile --prod
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:3001/api/v1/health || exit 1
+
+CMD ["node", "apps/api/dist/main.js"]

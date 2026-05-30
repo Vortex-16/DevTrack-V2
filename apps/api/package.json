@@ -22,7 +22,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@devtrack/ai-client": "workspace:*",
+    "@devtrack/config": "workspace:*",
     "@devtrack/database": "workspace:*",
+    "@devtrack/logger": "workspace:*",
     "@devtrack/shared-types": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^3.3.0",

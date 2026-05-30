@@ -1,0 +1,17 @@
+# Railway deployment config — DevTrack V2
+# Docs: https://docs.railway.app/reference/railway-toml
+#
+# Deployment target: Railway (chosen over Render)
+# Reason: Railway supports persistent services, no 15-min sleep, better free allowance for API workloads.
+# Vercel is used for the Next.js web frontend (zero config, free tier).
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "pnpm --filter @devtrack/api build"
+
+[deploy]
+startCommand = "node apps/api/dist/main.js"
+healthcheckPath = "/api/v1/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

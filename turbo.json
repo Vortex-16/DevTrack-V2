@@ -1,6 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  // Remote caching — set TURBO_TOKEN and TURBO_TEAM env vars (GitHub Secrets) to enable.
+  // First run populates the cache. Subsequent CI runs skip unchanged packages (~80% faster).
+  "remoteCache": {
+    "enabled": true
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

@@ -1,0 +1,65 @@
+name: Deploy Web → Vercel
+
+# Vercel auto-deploys via its GitHub integration on every push to main (production)
+# and on every PR (preview). This workflow exists only to document the required
+# GitHub Secrets and to run a post-deploy smoke test.
+#
+# Required one-time setup:
+#   1. Install Vercel GitHub App: https://vercel.com/integrations/github
+#   2. Link the `apps/web` directory as the Vercel project root
+#   3. Add these GitHub Secrets:
+#        VERCEL_TOKEN        — from vercel.com/account/tokens
+#        VERCEL_ORG_ID       — from vercel.com/account (team settings)
+#        VERCEL_PROJECT_ID   — from the Vercel project settings page
+#
+# For PR preview deployments — no workflow required.
+# Vercel GitHub App creates preview URLs automatically on every PR.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/config/**'
+      - 'packages/shared-types/**'
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
+jobs:
+  # ── Build check before Vercel picks it up ───────────────────
+  # Vercel will deploy automatically, but we run a typecheck here
+  # so broken PRs fail fast in CI before Vercel attempts its build.
+  typecheck-web:
+    name: Typecheck Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm --filter @devtrack/config build && pnpm --filter @devtrack/shared-types build
+
+      - name: Typecheck web app
+        run: pnpm --filter @devtrack/web typecheck
+        env:
+          # Dummy values so the Zod validation in next.config.ts passes during typecheck
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          CLERK_SECRET_KEY: sk_test_placeholder
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /dashboard
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /dashboard

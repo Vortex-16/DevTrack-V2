@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { validateApiEnv } from '@devtrack/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { getPinoOptions } from '@devtrack/logger';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -22,15 +24,16 @@ import { HealthModule } from './health/health.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
       cache: true,
+      validate: validateApiEnv,
     }),
 
     // ── Structured logging (Pino) ─────────────────────────────
     LoggerModule.forRoot({
       pinoHttp: {
-        level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-        ...(process.env.NODE_ENV !== 'production'
-          ? { transport: { target: 'pino-pretty', options: { colorize: true, singleLine: true } } }
-          : {}),
+        ...getPinoOptions({
+          nodeEnv: process.env.NODE_ENV ?? 'development',
+          serviceName: 'api',
+        }),
         customProps: (req: import('http').IncomingMessage) => ({
           traceId:
             (req.headers['x-trace-id'] as string | undefined) ?? crypto.randomUUID(),
