@@ -293,6 +293,54 @@ async function run() {
   }, authHeader);
   printResult('AI Complete (Growth Insight)', aiCompleteRes, 201);
 
+  // 7. Intelligence Layer Features
+  console.log('\n--- Running Intelligence Layer Tests ---');
+
+  // Developer Graph
+  const graphRes = await request('/api/v1/intelligence/graph', 'GET', null, authHeader);
+  printResult('Get Developer Graph', graphRes, 200);
+
+  const graphScoreRes = await request('/api/v1/intelligence/graph/score', 'GET', null, authHeader);
+  printResult('Get Centrality Score', graphScoreRes, 200);
+
+  // Momentum Signal
+  const momentumRes = await request('/api/v1/intelligence/momentum', 'GET', null, authHeader);
+  printResult('Get Momentum Signal', momentumRes, 200);
+
+  const burnoutRes = await request('/api/v1/intelligence/momentum/burnout-risk', 'GET', null, authHeader);
+  printResult('Get Burnout Risk', burnoutRes, 200);
+
+  // Build Memory
+  const createMemoryRes = await request('/api/v1/intelligence/memory', 'POST', {
+    title: 'Learned NestJS Guards',
+    content: 'Guards execute before route handlers and can deny access based on custom logic.',
+    tags: ['nestjs', 'auth', 'backend']
+  }, authHeader);
+  printResult('Create Build Memory', createMemoryRes, 201);
+
+  const listMemoryRes = await request('/api/v1/intelligence/memory', 'GET', null, authHeader);
+  printResult('List Build Memories', listMemoryRes, 200);
+
+  // Skill Confidence
+  const inferSkillsRes = await request('/api/v1/intelligence/skills/infer', 'POST', null, authHeader);
+  printResult('Infer Skills', inferSkillsRes, 200);
+
+  const skillsRes = await request('/api/v1/intelligence/skills', 'GET', null, authHeader);
+  printResult('Get Skills', skillsRes, 200);
+
+  // Developer Reputation
+  const computeRepRes = await request('/api/v1/intelligence/reputation/compute', 'POST', null, authHeader);
+  printResult('Compute Reputation', computeRepRes, 200);
+
+  const reputationRes = await request('/api/v1/intelligence/reputation', 'GET', null, authHeader);
+  printResult('Get Reputation', reputationRes, 200);
+
+  // AI Coach Session
+  const coachRes = await request('/api/v1/intelligence/coach', 'POST', {
+    prompt: 'How can I improve my commit quality and maintain a healthy work-life balance?'
+  }, authHeader);
+  printResult('Create Coach Session', coachRes, 201);
+
   console.log('\n==================================================');
   console.log('                 TEST RUN COMPLETE                ');
   console.log('==================================================\n');

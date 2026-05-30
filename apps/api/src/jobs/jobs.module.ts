@@ -6,9 +6,12 @@ import { InsightGenJob } from './insight-gen.job';
 import { GraphComputeJob } from './graph-compute.job';
 import { DnaAnalysisJob } from './dna-analysis.job';
 import { MomentumScanJob } from './momentum-scan.job';
+import { SkillInferenceJob } from './skill-inference.job';
+import { ReputationComputeJob } from './reputation-compute.job';
 import { GithubModule } from '../github/github.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AiModule } from '../ai/ai.module';
+import { IntelligenceModule } from '../intelligence/intelligence.module';
 
 /**
  * JobsModule — trigger-only.
@@ -17,7 +20,7 @@ import { AiModule } from '../ai/ai.module';
  * Swap @nestjs/schedule → BullMQ: only this module + job files change.
  */
 @Module({
-  imports: [GithubModule, AnalyticsModule, AiModule],
+  imports: [GithubModule, AnalyticsModule, AiModule, IntelligenceModule],
   providers: [
     GithubSyncJob,
     AiAnalysisJob,
@@ -26,6 +29,8 @@ import { AiModule } from '../ai/ai.module';
     GraphComputeJob,
     DnaAnalysisJob,
     MomentumScanJob,
+    SkillInferenceJob,
+    ReputationComputeJob,
   ],
 })
 export class JobsModule {}

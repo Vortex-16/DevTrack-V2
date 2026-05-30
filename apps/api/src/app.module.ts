@@ -14,8 +14,11 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AiModule } from './ai/ai.module';
 import { ProjectsModule } from './projects/projects.module';
 import { LearningModule } from './learning/learning.module';
+import { IntelligenceModule } from './intelligence/intelligence.module';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthModule } from './health/health.module';
+import { AdminModule } from './admin/admin.module';
+import { HackathonModule } from './hackathon/hackathon.module';
 
 @Module({
   imports: [
@@ -65,8 +68,11 @@ import { HealthModule } from './health/health.module';
     AiModule,
     ProjectsModule,
     LearningModule,
+    IntelligenceModule,
     JobsModule,
     HealthModule,
+    AdminModule,
+    HackathonModule,
   ],
 })
-export class AppModule {}
+export class AppModule {}{}

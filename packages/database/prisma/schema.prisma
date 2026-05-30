@@ -18,6 +18,12 @@ enum Plan {
   ENTERPRISE
 }
 
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
 enum SyncStatus {
   PENDING
   RUNNING
@@ -63,6 +69,67 @@ enum Mood {
   BLOCKED
 }
 
+enum AuditAction {
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  USER_ROLE_CHANGED
+  USER_PLAN_CHANGED
+  PASSWORD_CHANGED
+  TOKEN_REFRESHED
+  GITHUB_CONNECTED
+  GITHUB_DISCONNECTED
+  PROJECT_CREATED
+  PROJECT_DELETED
+  ADMIN_ACTION
+}
+
+enum HackathonStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum HackathonRole {
+  PARTICIPANT
+  MENTOR
+  JUDGE
+  ORGANIZER
+}
+
+enum AnomalyType {
+  PADDING
+  COSMETIC
+  DUPLICATE
+  LOW_SIGNAL
+  CRAMMING
+  PURE_NOISE
+  QUALITY_RISK
+}
+
+enum AnomalySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AnomalyStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+}
+
+enum CommitType {
+  FEATURE
+  FIX
+  REFACTOR
+  TEST
+  DOCS
+  CHORE
+}
+
 // ─────────────────────────────────────────────────────────────
 // USER & IDENTITY
 // ─────────────────────────────────────────────────────────────
@@ -73,6 +140,7 @@ model User {
   email     String    @unique
   username  String?   @unique
   plan      Plan      @default(FREE)
+  role      Role      @default(USER)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // soft delete
@@ -93,6 +161,7 @@ model User {
   skillConfidences SkillConfidence[]
   coachSessions    CoachSession[]
   developerReputation DeveloperReputation?
+  hackathonParticipants HackathonParticipant[]
 
   @@index([clerkId])
   @@index([email])
@@ -440,4 +509,214 @@ model CommitQualityScore {
   computedAt DateTime @default(now())
 
   @@index([commitId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUDIT & SECURITY
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id            String      @id @default(cuid())
+  action        AuditAction
+  performedBy   String      // User ID who performed the action
+  targetUserId  String?     // User ID affected by the action (if applicable)
+  targetResource String?    // Resource type (e.g., "Project", "Repository")
+  targetResourceId String?  // Resource ID
+  metadata      Json?       // Additional context (old/new values, IP, etc.)
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime    @default(now())
+
+  @@index([performedBy])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// HACKATHON MODE (V2.2)
+// ─────────────────────────────────────────────────────────────
+
+model Hackathon {
+  id          String          @id @default(cuid())
+  name        String
+  description String?         @db.Text
+  status      HackathonStatus @default(DRAFT)
+  startDate   DateTime
+  endDate     DateTime
+  createdBy   String          // User ID of organizer
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  teams              Team[]
+  participants       HackathonParticipant[]
+  scoringWeights     ScoringWeight[]
+  progressSnapshots  TeamProgressSnapshot[]
+
+  @@index([status])
+  @@index([createdBy])
+  @@index([startDate, endDate])
+}
+
+model Team {
+  id           String   @id @default(cuid())
+  hackathonId  String
+  name         String
+  repositoryId String?  // GitHub repository ID
+  totalScore   Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  hackathon         Hackathon              @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  participants      HackathonParticipant[]
+  progressSnapshots TeamProgressSnapshot[]
+  anomalyEvents     AnomalyEvent[]
+  commitAnalyses    CommitAnalysis[]
+
+  @@index([hackathonId])
+  @@index([totalScore])
+}
+
+model HackathonParticipant {
+  id          String        @id @default(cuid())
+  hackathonId String
+  teamId      String?
+  userId      String
+  role        HackathonRole @default(PARTICIPANT)
+  joinedAt    DateTime      @default(now())
+
+  // Relations
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  team      Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([hackathonId, userId])
+  @@index([hackathonId])
+  @@index([teamId])
+  @@index([userId])
+  @@index([role])
+}
+
+model CommitAnalysis {
+  id                   String     @id @default(cuid())
+  teamId               String
+  commitSha            String     @unique
+  commitMessage        String     @db.Text
+  authorUsername       String?
+  committedAt          DateTime
+  commitType           CommitType
+  summary              String?    @db.Text
+  progressValue        Float      // 0.0-1.0 from AI
+  confidence           Float      // 0.0-1.0 from AI
+  riskFlag             Boolean    @default(false)
+  implementationScore  Float      @default(0)
+  testScore            Float      @default(0)
+  breadthScore         Float      @default(0)
+  consistencyScore     Float      @default(0)
+  qualityScore         Float      @default(0)
+  totalScore           Float      @default(0)
+  aiModel              String?    // Model used for analysis
+  analyzedAt           DateTime   @default(now())
+
+  // Relations
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  fileChanges   FileChange[]
+  anomalyEvents AnomalyEvent[]
+
+  @@index([teamId])
+  @@index([commitSha])
+  @@index([committedAt])
+  @@index([authorUsername])
+}
+
+model FileChange {
+  id                String   @id @default(cuid())
+  commitAnalysisId  String
+  filePath          String
+  changeType        String   // added, modified, deleted
+  additions         Int      @default(0)
+  deletions         Int      @default(0)
+  relevanceScore    Float    // 0.0-1.0 from file relevance filter
+  createdAt         DateTime @default(now())
+
+  // Relations
+  commitAnalysis CommitAnalysis @relation(fields: [commitAnalysisId], references: [id], onDelete: Cascade)
+
+  @@index([commitAnalysisId])
+  @@index([relevanceScore])
+}
+
+model TeamProgressSnapshot {
+  id                   String   @id @default(cuid())
+  teamId               String
+  hackathonId          String
+  snapshotAt           DateTime @default(now())
+  totalScore           Float
+  implementationScore  Float
+  testScore            Float
+  breadthScore         Float
+  consistencyScore     Float
+  qualityScore         Float
+  anomalyCount         Int      @default(0)
+  riskLevel            String?  // LOW, MEDIUM, HIGH, CRITICAL
+
+  // Relations
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, snapshotAt])
+  @@index([hackathonId])
+}
+
+model AnomalyEvent {
+  id               String          @id @default(cuid())
+  teamId           String
+  commitAnalysisId String?
+  anomalyType      AnomalyType
+  severity         AnomalySeverity
+  status           AnomalyStatus   @default(OPEN)
+  autoDetected     Boolean         @default(true)
+  description      String?         @db.Text
+  reviewedBy       String?         // User ID
+  resolution       String?         @db.Text
+  createdAt        DateTime        @default(now())
+  reviewedAt       DateTime?
+
+  // Relations
+  team           Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  commitAnalysis CommitAnalysis? @relation(fields: [commitAnalysisId], references: [id], onDelete: SetNull)
+
+  @@index([teamId, severity, status])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ScoringWeight {
+  id          String   @id @default(cuid())
+  hackathonId String
+  dimension   String   // implementation, test, breadth, consistency, quality
+  weight      Float    // 0.0-1.0
+  version     Int      @default(1)
+  createdBy   String   // User ID
+  createdAt   DateTime @default(now())
+
+  // Relations
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+
+  @@unique([hackathonId, dimension, version])
+  @@index([hackathonId])
+}
+
+model FileRelevanceCache {
+  id              String   @id @default(cuid())
+  filePathHash    String   @unique
+  repositoryId    String?
+  relevanceScore  Float
+  ruleBreakdown   Json?    // Breakdown of which rules contributed to score
+  computedAt      DateTime @default(now())
+
+  @@index([filePathHash])
+  @@index([repositoryId])
 }

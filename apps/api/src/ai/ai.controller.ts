@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, UseGuards, Query, Param, Delete, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ClerkAuthGuard } from '../auth/clerk.guard';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { AiService } from './ai.service';
@@ -61,8 +62,10 @@ export class AiController {
   /**
    * POST /api/v1/ai/complete
    * Raw AI completion — for custom prompts.
+   * Rate limit: 10 requests/hour per user
    */
   @Post('complete')
+  @Throttle({ short: { limit: 3, ttl: 1000 }, long: { limit: 10, ttl: 3600000 } })
   complete(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AiCompleteDto,

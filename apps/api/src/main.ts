@@ -17,6 +17,7 @@ if (sentryDsn) {
 
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
@@ -85,6 +86,43 @@ async function bootstrap() {
     );
   } catch (e) {
     // Helmet not installed — skip middleware (dev environments may omit it)
+  }
+
+  // ── Swagger API Documentation ────────────────────────────────
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('DevTrack V2 API')
+      .setDescription('Engineering Growth OS - Track commits, analyze patterns, and accelerate developer growth')
+      .setVersion('2.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Enter your Clerk JWT token',
+        },
+        'JWT',
+      )
+      .addTag('auth', 'Authentication & Authorization')
+      .addTag('users', 'User Management')
+      .addTag('github', 'GitHub Integration')
+      .addTag('analytics', 'Analytics & Insights')
+      .addTag('ai', 'AI-Powered Features')
+      .addTag('intelligence', 'Intelligence Layer')
+      .addTag('projects', 'Project Management')
+      .addTag('learning', 'Learning Logs')
+      .addTag('admin', 'Admin Operations')
+      .addTag('health', 'Health Checks')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      customSiteTitle: 'DevTrack V2 API Docs',
+      customfavIcon: 'https://nestjs.com/img/logo-small.svg',
+      customCss: '.swagger-ui .topbar { display: none }',
+    });
+
+    process.stdout.write('[DevTrack API] Swagger docs available at /api/docs\n');
   }
 
   const port = parseInt(process.env.PORT ?? '3001', 10);

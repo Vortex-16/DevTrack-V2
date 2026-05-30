@@ -104,6 +104,7 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk-jwt') {
       clerkId: user.clerkId,
       email: user.email,
       plan: user.plan,
+      role: user.role,
     };
   }
 }

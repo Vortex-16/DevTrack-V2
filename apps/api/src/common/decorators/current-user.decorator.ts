@@ -32,4 +32,6 @@ export interface AuthenticatedUser {
   email: string;
   /** Subscription plan */
   plan: 'FREE' | 'PRO' | 'ENTERPRISE';
+  /** User role for RBAC */
+  role: 'USER' | 'ADMIN' | 'MODERATOR';
 }
