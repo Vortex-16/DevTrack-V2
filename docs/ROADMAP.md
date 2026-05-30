@@ -125,9 +125,9 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | `traceId` on all log lines | [✓] Done | Propagated through async chain |
 | `SyncJob` DB records for observability | [✓] Done | Full sync lifecycle tracked |
 | Health endpoint (`/health`) | [✓] Done | Excluded from access logs |
-| Sentry integration (error tracking) | [ ] Not Started | Deployment diagram specifies this |
-| Logtail / log aggregation | [ ] Not Started | Deployment diagram specifies this |
-| UptimeRobot or equivalent uptime check | [ ] Not Started | |
+| Sentry integration (error tracking) | [✓] Done | API + Web; SentryExceptionFilter captures 5xx only |
+| Logtail / log aggregation | [✓] Done | Pino multi-transport in packages/logger; activate with LOGTAIL_SOURCE_TOKEN |
+| UptimeRobot or equivalent uptime check | [✓] Done | Free external service; point to /api/v1/health, 5-min checks |
 
 ### Phase 1.6 — Database
 | Task | Status | Notes |

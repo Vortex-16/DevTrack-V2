@@ -43,6 +43,7 @@ export const apiEnvSchema = z.object({
 
   // Observability
   SENTRY_DSN: z.string().url().optional(),
+  LOGTAIL_SOURCE_TOKEN: z.string().optional(),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

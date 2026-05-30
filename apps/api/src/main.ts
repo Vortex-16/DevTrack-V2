@@ -1,5 +1,23 @@
-import { NestFactory } from '@nestjs/core';
+// Sentry MUST be initialized before any other imports so it can instrument
+// the entire application — including NestJS lifecycle hooks, providers, and pipes.
+import * as Sentry from '@sentry/node';
+
+const sentryDsn = process.env.SENTRY_DSN;
+
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: process.env.NODE_ENV ?? 'development',
+    // Only send traces in production to avoid noise during development
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 0,
+    // Capture unhandled promise rejections automatically
+    integrations: [Sentry.onUncaughtExceptionIntegration()],
+  });
+}
+
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
@@ -11,6 +29,12 @@ async function bootstrap() {
 
   // ── Pino structured logger ──────────────────────────────────
   app.useLogger(app.get(Logger));
+
+  // ── Sentry global error capture ──────────────────────────────
+  if (sentryDsn) {
+    const { httpAdapter } = app.get(HttpAdapterHost);
+    app.useGlobalFilters(new SentryExceptionFilter(httpAdapter));
+  }
 
   // ── Global validation pipe ──────────────────────────────────
   // whitelist: strip unknown properties silently
@@ -40,7 +64,6 @@ async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '3001', 10);
   await app.listen(port, '0.0.0.0');
 
-  // Use process.stdout.write to avoid importing a logger before it's ready
   process.stdout.write(
     `[DevTrack API] Listening on port ${port} (${process.env.NODE_ENV ?? 'development'})\n`,
   );

@@ -27,12 +27,13 @@ import { HealthModule } from './health/health.module';
       validate: validateApiEnv,
     }),
 
-    // ── Structured logging (Pino) ─────────────────────────────
+    // ── Structured logging (Pino + optional Logtail in prod) ─────
     LoggerModule.forRoot({
       pinoHttp: {
         ...getPinoOptions({
           nodeEnv: process.env.NODE_ENV ?? 'development',
           serviceName: 'api',
+          logtailToken: process.env.LOGTAIL_SOURCE_TOKEN,
         }),
         customProps: (req: import('http').IncomingMessage) => ({
           traceId:
