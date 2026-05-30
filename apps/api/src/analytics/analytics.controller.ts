@@ -12,4 +12,34 @@ export class AnalyticsController {
   getDashboard(@CurrentUser() user: AuthenticatedUser) {
     return this.analyticsService.getDashboardSummary(user.id);
   }
+
+  @Get('summary')
+  getSummary(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getDashboardSummary(user.id);
+  }
+
+  @Get('streak')
+  getCurrentStreak(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getDashboardSummary(user.id).then((d) => ({ currentStreak: d.currentStreak }));
+  }
+
+  @Get('streak/history')
+  getStreakHistory(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getStreakHistory(user.id, 90);
+  }
+
+  @Get('velocity')
+  getVelocity(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getDashboardSummary(user.id).then((d) => ({ velocity: d.velocity }));
+  }
+
+  @Get('languages')
+  getLanguages(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getLanguageBreakdown(user.id);
+  }
+
+  @Get('commits')
+  getCommits(@CurrentUser() user: AuthenticatedUser) {
+    return this.analyticsService.getCommitsGraph(user.id, 30);
+  }
 }

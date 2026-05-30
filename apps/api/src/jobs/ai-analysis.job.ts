@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../database/prisma.service';
+import { buildRepoAnalysisPrompt } from '../ai/prompts/v1/repo-analysis.prompt';
+import { GROWTH_INSIGHT_SYSTEM_PROMPT } from '../ai/prompts/v1/growth-insight.prompt';
 
 /**
  * AiAnalysisJob — nightly AI insight generation.
@@ -14,18 +16,6 @@ import { PrismaService } from '../database/prisma.service';
 @Injectable()
 export class AiAnalysisJob {
   private readonly logger = new Logger(AiAnalysisJob.name);
-
-  private static readonly GROWTH_SUMMARY_PROMPT = (stats: {
-    commits7d: number;
-    commits30d: number;
-    topLanguage: string;
-  }) =>
-    `You are a developer growth coach. Based on these stats:
-- Commits last 7 days: ${stats.commits7d}
-- Commits last 30 days: ${stats.commits30d}
-- Primary language: ${stats.topLanguage}
-
-Provide a concise (3-4 sentences) growth insight with one specific, actionable recommendation. Be encouraging but honest.`;
 
   constructor(
     private readonly aiService: AiService,
@@ -94,7 +84,7 @@ Provide a concise (3-4 sentences) growth insight with one specific, actionable r
       }),
     ]);
 
-    const prompt = AiAnalysisJob.GROWTH_SUMMARY_PROMPT({
+    const prompt = buildRepoAnalysisPrompt({
       commits7d,
       commits30d,
       topLanguage: topLang?.language ?? 'various languages',
@@ -102,7 +92,7 @@ Provide a concise (3-4 sentences) growth insight with one specific, actionable r
 
     await this.aiService.complete(userId, prompt, {
       maxTokens: 512,
-      systemPrompt: 'You are a concise, data-driven developer growth coach.',
+      systemPrompt: GROWTH_INSIGHT_SYSTEM_PROMPT,
     });
 
     this.logger.log({ msg: 'AI analysis complete', userId, traceId });

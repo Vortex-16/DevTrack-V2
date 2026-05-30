@@ -164,6 +164,13 @@ export class GithubOAuthService {
     });
   }
 
+  async getAccountByLogin(login: string) {
+    return this.prisma.gitHubAccount.findFirst({
+      where: { login },
+      select: { userId: true, login: true },
+    });
+  }
+
   // ── Private HTTP helpers ───────────────────────────────────────
 
   private async exchangeCode(code: string): Promise<GitHubTokenResponse> {

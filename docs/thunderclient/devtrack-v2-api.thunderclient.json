@@ -156,6 +156,23 @@
     },
 
     {
+      "_id": "r-analytics-languages",
+      "colId": "",
+      "containerId": "f-analytics",
+      "name": "Get Language Breakdown",
+      "url": "{{baseUrl}}/api/v1/analytics/languages",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{clerkToken}}" }
+      ],
+      "params": [],
+      "body": { "type": "none" },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+      ]
+    },
+
+    {
       "_id": "r-projects-list",
       "colId": "",
       "containerId": "f-projects",

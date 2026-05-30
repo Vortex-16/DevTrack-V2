@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Query, Param, Delete, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ClerkAuthGuard } from '../auth/clerk.guard';
 import { CurrentUser, AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { AiService } from './ai.service';
@@ -6,6 +6,11 @@ import { AIOptions } from './providers/ai-provider.interface';
 import { PrismaService } from '../database/prisma.service';
 import { IsString, MaxLength, IsOptional, IsNumber, Min, Max, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
+import { buildAssistantSystemPrompt } from './prompts/v1/assistant.prompt';
+import { buildGrowthInsightPrompt, GROWTH_INSIGHT_SYSTEM_PROMPT } from './prompts/v1/growth-insight.prompt';
+import { buildRepoAnalysisPrompt } from './prompts/v1/repo-analysis.prompt';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { RequireOwnership } from '../common/decorators/require-ownership.decorator';
 
 class AiCompleteDto {
   @IsString()
@@ -39,6 +44,11 @@ class ChatAssistantDto {
   @IsString()
   @MaxLength(2000)
   message!: string;
+}
+
+class RepoAnalysisDto {
+  @IsString()
+  repositoryId!: string;
 }
 
 @Controller({ path: 'ai', version: '1' })
@@ -119,6 +129,37 @@ export class AiController {
   }
 
   /**
+   * GET /api/v1/ai/insights/:id
+   * Return a single AIInsight with full prompt/response (owner-only).
+   */
+  @Get('insights/:id')
+  async getInsightById(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const insight = await this.prisma.aIInsight.findUnique({ where: { id } });
+    if (!insight) throw new NotFoundException('Insight not found');
+    if (insight.userId !== user.id) throw new ForbiddenException();
+    return insight;
+  }
+
+  /**
+   * DELETE /api/v1/ai/insights/:id
+   * Delete an AIInsight (owner-only).
+   */
+  @Delete('insights/:id')
+  async deleteInsight(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const insight = await this.prisma.aIInsight.findUnique({ where: { id } });
+    if (!insight) throw new NotFoundException('Insight not found');
+    if (insight.userId !== user.id) throw new ForbiddenException();
+    await this.prisma.aIInsight.delete({ where: { id } });
+    return { deleted: true };
+  }
+
+  /**
    * POST /api/v1/ai/insights/generate
    * Manually trigger an AI insight generation for the current user.
    * Useful for onboarding and testing without waiting for the nightly cron.
@@ -145,16 +186,15 @@ export class AiController {
       }),
     ]);
 
-    const prompt = `You are a developer growth coach. Based on these stats:
-- Commits last 7 days: ${commits7d}
-- Commits last 30 days: ${commits30d}
-- Primary language: ${topLang?.language ?? 'various'}
-
-Provide a concise 3-4 sentence growth insight with one specific, actionable recommendation.`;
+    const prompt = buildGrowthInsightPrompt({
+      commits7d,
+      commits30d,
+      primaryLanguage: topLang?.language ?? 'various',
+    });
 
     const result = await this.aiService.complete(user.id, prompt, {
       maxTokens: 512,
-      systemPrompt: 'You are a concise, data-driven developer growth coach.',
+      systemPrompt: GROWTH_INSIGHT_SYSTEM_PROMPT,
     });
 
     return {
@@ -164,6 +204,47 @@ Provide a concise 3-4 sentence growth insight with one specific, actionable reco
       model: result.model,
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * POST /api/v1/ai/repo-analysis
+   * Run a repo analysis using the extracted prompt for a specific repository.
+   */
+  @Post('repo-analysis')
+  @UseGuards(OwnershipGuard)
+  @RequireOwnership('repository', 'repositoryId')
+  async runRepoAnalysis(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RepoAnalysisDto,
+  ) {
+    const repo = await this.prisma.repository.findUnique({ where: { id: dto.repositoryId } });
+    if (!repo) throw new NotFoundException('Repository not found');
+    if (repo.userId !== user.id) throw new ForbiddenException();
+
+    const [commits7d, commits30d] = await Promise.all([
+      this.prisma.commit.count({ where: { repositoryId: repo.id, committedAt: { gte: new Date(Date.now() - 7 * 86400_000) } } }),
+      this.prisma.commit.count({ where: { repositoryId: repo.id, committedAt: { gte: new Date(Date.now() - 30 * 86400_000) } } }),
+    ]);
+
+    const prompt = buildRepoAnalysisPrompt({ commits7d, commits30d, topLanguage: repo.language ?? 'various' });
+
+    const result = await this.aiService.complete(user.id, prompt, { maxTokens: 512 });
+
+    // Upsert a RepoAnalysis summary record
+    await this.prisma.repoAnalysis.upsert({
+      where: { repositoryId: repo.id },
+      create: {
+        repositoryId: repo.id,
+        summary: result.text,
+        languages: {},
+      },
+      update: {
+        summary: result.text,
+        analyzedAt: new Date(),
+      },
+    });
+
+    return { summary: result.text, provider: result.provider, model: result.model };
   }
 
   /**
@@ -231,12 +312,7 @@ Provide a concise 3-4 sentence growth insight with one specific, actionable reco
     }
 
     // 3. Complete using our AI pipeline
-    const systemPrompt = `You are DevTrack AI, a professional developer assistant/workspace copilot.
-You have access to the user's local projects, tasks, connected GitHub repositories, and commits.
-Provide a professional, concise (1-3 sentences), highly actionable answer to the user's request.
-Always reference their actual projects/repositories/tasks if relevant to make it specific.
-
-${contextStr}`;
+    const systemPrompt = buildAssistantSystemPrompt(contextStr);
 
     const completion = await this.aiService.complete(user.id, dto.message, {
       systemPrompt,
@@ -256,5 +332,14 @@ ${contextStr}`;
       model: completion.model,
       audio: audioBase64,
     };
+  }
+
+  /**
+   * GET /api/v1/ai/providers
+   * Returns provider availability status.
+   */
+  @Get('providers')
+  async getProviders() {
+    return this.aiService.getProvidersStatus();
   }
 }

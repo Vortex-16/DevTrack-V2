@@ -25,6 +25,7 @@ export const apiEnvSchema = z.object({
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
   GITHUB_CALLBACK_URL: z.string().url(),
+  GITHUB_WEBHOOK_SECRET: z.string().min(1).optional(),
   MOBILE_DEEP_LINK_BASE: z.string().default('devtrack://oauth/github'),
 
   // AI Providers (all optional — service degrades gracefully)

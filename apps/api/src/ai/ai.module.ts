@@ -5,6 +5,7 @@ import { NvidiaNimProvider } from './providers/nvidia-nim.provider';
 import { GroqProvider } from './providers/groq.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { ElevenLabsService } from './providers/elevenlabs.service';
+import { MockProvider } from './providers/mock.provider';
 
 @Module({
   controllers: [AiController],
@@ -13,6 +14,7 @@ import { ElevenLabsService } from './providers/elevenlabs.service';
     NvidiaNimProvider,
     GroqProvider,
     GeminiProvider,
+    MockProvider,
     ElevenLabsService,
   ],
   exports: [AiService, ElevenLabsService],

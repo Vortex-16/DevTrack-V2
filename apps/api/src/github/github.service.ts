@@ -48,6 +48,20 @@ export class GithubService {
     this.logger.log({ msg: 'Scheduled GitHub sync complete', traceId });
   }
 
+  async runUserSync(userId: string, traceId: string = crypto.randomUUID()): Promise<boolean> {
+    const account = await this.prisma.gitHubAccount.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!account) {
+      return false;
+    }
+
+    await this.syncAccount(userId, account, traceId);
+    return true;
+  }
+
   private async syncAccount(
     userId: string,
     account: { id: string; encryptedToken: string; login: string },

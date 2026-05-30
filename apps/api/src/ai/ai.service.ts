@@ -3,7 +3,9 @@ import { PrismaService } from '../database/prisma.service';
 import { NvidiaNimProvider } from './providers/nvidia-nim.provider';
 import { GroqProvider } from './providers/groq.provider';
 import { GeminiProvider } from './providers/gemini.provider';
+import { MockProvider } from './providers/mock.provider';
 import { AIOptions, AIResult } from './providers/ai-provider.interface';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * AiService — orchestrates the provider fallback chain.
@@ -24,9 +26,11 @@ export class AiService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     private readonly nvidia: NvidiaNimProvider,
     private readonly groq: GroqProvider,
     private readonly gemini: GeminiProvider,
+    private readonly mock: MockProvider,
   ) {}
 
   async complete(
@@ -58,11 +62,34 @@ export class AiService {
     return result;
   }
 
+  /**
+   * Returns availability status for configured providers.
+   */
+  async getProvidersStatus(): Promise<{ name: string; available: boolean }[]> {
+    const providers = [this.mock, this.nvidia, this.groq, this.gemini];
+    const out: { name: string; available: boolean }[] = [];
+    for (const p of providers) {
+      try {
+        const available = await p.isAvailable();
+        out.push({ name: p.name, available });
+      } catch (e) {
+        out.push({ name: p.name, available: false });
+      }
+    }
+    return out;
+  }
+
   private async tryProviders(
     prompt: string,
     options: AIOptions,
   ): Promise<AIResult> {
-    const providers = [this.nvidia, this.groq, this.gemini];
+    const useMock =
+      this.config.get<string>('NODE_ENV') === 'test' ||
+      this.config.get<string>('AI_MOCK_PROVIDER') === 'true';
+
+    const providers = useMock
+      ? [this.mock, this.nvidia, this.groq, this.gemini]
+      : [this.nvidia, this.groq, this.gemini];
 
     for (const provider of providers) {
       const available = await provider.isAvailable();

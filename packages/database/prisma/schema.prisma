@@ -87,6 +87,12 @@ model User {
   streaks       Streak[]
   projects      Project[]
   learningLogs  LearningLog[]
+  developerGraphs DeveloperGraph[]
+  buildMemories   BuildMemory[]
+  momentumSignals MomentumSignal[]
+  skillConfidences SkillConfidence[]
+  coachSessions    CoachSession[]
+  developerReputation DeveloperReputation?
 
   @@index([clerkId])
   @@index([email])
@@ -289,6 +295,7 @@ model Project {
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks Task[]
+  projectDNA ProjectDNA?
 
   @@index([userId, status])
   @@index([deletedAt])
@@ -331,4 +338,106 @@ model LearningLog {
   @@index([userId])
   @@index([loggedAt])
   @@index([tags])
+}
+
+// ─────────────────────────────────────────────────────────────
+// INTELLIGENCE LAYER (V2.1) — simple, extendable models
+// Keep these small; services will implement logic and validation.
+// ─────────────────────────────────────────────────────────────
+
+model DeveloperGraph {
+  id        String   @id @default(cuid())
+  userId    String
+  // flexible graph representation (nodes/edges) or vector metadata
+  graph     Json
+  score     Float?   // aggregated 0-100 score
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ProjectDNA {
+  id         String   @id @default(cuid())
+  projectId  String   @unique
+  fingerprint Json    // architecture / language fingerprint
+  summary    String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model BuildMemory {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  content   String   @db.Text
+  tags      String[]
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tags])
+}
+
+model MomentumSignal {
+  id         String   @id @default(cuid())
+  userId     String
+  windowDays Int       @default(14)
+  velocity   Float    // commits/day or similar metric
+  burnoutRisk Float?  // 0-1
+  computedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, computedAt])
+}
+
+model SkillConfidence {
+  id        String   @id @default(cuid())
+  userId    String
+  skill     String
+  confidence Float   // 0-1
+  evidence   Json?   // pointers to commits, code samples, etc.
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skill])
+}
+
+model DeveloperReputation {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  score     Float    // 0-100
+  sources   Json?    // breakdown of contributors to score
+  computedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CoachSession {
+  id        String   @id @default(cuid())
+  userId    String
+  prompt    String   @db.Text
+  response  String   @db.Text
+  model     String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model CommitQualityScore {
+  id        String   @id @default(cuid())
+  commitId  String   @unique
+  score     Float    // 0-100
+  details   Json?    // per-file or heuristic breakdown
+  computedAt DateTime @default(now())
+
+  @@index([commitId])
 }

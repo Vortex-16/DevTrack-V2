@@ -46,6 +46,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create Neon branch for PR
+        if: github.event_name == 'pull_request'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          BRANCH_NAME: pr-${{ github.event.number }}
+        run: |
+          npx -y neonctl --api-key "$NEON_API_KEY" branches create --project-id "$NEON_PROJECT_ID" --name "$BRANCH_NAME" --output json
+
+          DATABASE_URL=$(npx -y neonctl --api-key "$NEON_API_KEY" connection-string "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" --pooled)
+          DIRECT_URL=$(npx -y neonctl --api-key "$NEON_API_KEY" connection-string "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" --prisma)
+
+          echo "DATABASE_URL=$DATABASE_URL" >> "$GITHUB_ENV"
+          echo "DIRECT_URL=$DIRECT_URL" >> "$GITHUB_ENV"
+
+      - name: Use repository database secrets on push
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> "$GITHUB_ENV"
+          echo "DIRECT_URL=${{ secrets.DIRECT_URL }}" >> "$GITHUB_ENV"
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10

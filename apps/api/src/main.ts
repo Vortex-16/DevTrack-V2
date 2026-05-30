@@ -25,6 +25,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     // Suppress default NestJS logger; Pino takes over
     bufferLogs: true,
+    rawBody: true,
   });
 
   // ── Pino structured logger ──────────────────────────────────

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { GithubSyncJob } from './github-sync.job';
 import { AiAnalysisJob } from './ai-analysis.job';
 import { StreakComputeJob } from './streak-compute.job';
+import { InsightGenJob } from './insight-gen.job';
 import { GithubModule } from '../github/github.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AiModule } from '../ai/ai.module';
@@ -14,6 +15,6 @@ import { AiModule } from '../ai/ai.module';
  */
 @Module({
   imports: [GithubModule, AnalyticsModule, AiModule],
-  providers: [GithubSyncJob, AiAnalysisJob, StreakComputeJob],
+  providers: [GithubSyncJob, AiAnalysisJob, StreakComputeJob, InsightGenJob],
 })
 export class JobsModule {}

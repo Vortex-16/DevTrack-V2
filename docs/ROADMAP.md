@@ -135,8 +135,8 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | Prisma schema — all core models | [✓] Done | 12 models, all indexed |
 | Initial migration (`20260524_init`) | [✓] Done | |
 | `DATABASE_URL` (pooled) + `DIRECT_URL` | [✓] Done | Neon PgBouncer config |
-| Database branching per PR (Neon) | [ ] Not Started | Free on Neon — needs setup |
-| Intelligence layer schema additions | [ ] Not Started | V2.1 — DeveloperGraph, ProjectDNA etc. |
+| Database branching per PR (Neon) | [✓] Done | Branching guide + helper script added in `packages/database` |
+| Intelligence layer schema additions | [✓] Done | Lightweight models added to Prisma schema (V2.1) |
 
 ---
 
@@ -199,12 +199,12 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | `StreakService` (append-only, per-day) | [✓] Done | Exact algorithm implemented |
 | Streak recompute on `github.sync.completed` | [✓] Done | `@OnEvent` listener |
 | `VelocityService` | [✓] Done | |
-| `AnalyticsController` | [~] Partial | Mostly empty — needs endpoints |
-| `GET /analytics/streak` — current streak | [ ] Not Started | |
-| `GET /analytics/commits` — commit graph data | [ ] Not Started | |
-| `GET /analytics/languages` — language breakdown | [ ] Not Started | |
-| `GET /analytics/velocity` — commit velocity | [ ] Not Started | |
-| `GET /analytics/summary` — full dashboard data | [ ] Not Started | |
+| `AnalyticsController` | [✓] Done | Streak, commits, languages, velocity, summary |
+| `GET /analytics/streak` — current streak | [✓] Done | |
+| `GET /analytics/commits` — commit graph data | [✓] Done | |
+| `GET /analytics/languages` — language breakdown | [✓] Done | |
+| `GET /analytics/velocity` — commit velocity | [✓] Done | |
+| `GET /analytics/summary` — full dashboard data | [✓] Done | |
 
 ### Phase 2.6 — AI Module
 | Task | Status | Notes |
@@ -217,11 +217,11 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | Token hard cap (`MAX_TOKENS_CAP = 2048`) | [✓] Done | |
 | All AI calls logged to `AIInsight` table | [✓] Done | |
 | ElevenLabs service (TTS) | [✓] Done | Bonus — not in arch docs |
-| Mock provider (for CI/testing) | [ ] Not Started | |
-| Versioned prompt files (`ai/prompts/v1/`) | [ ] Not Started | Currently inline strings |
-| `AiController` endpoints | [~] Partial | Basic — needs full REST surface |
-| Repo analysis prompt + pipeline | [~] Partial | Inline in `ai-analysis.job.ts` |
-| Weekly insight prompt + pipeline | [ ] Not Started | |
+| Mock provider (for CI/testing) | [✓] Done | Deterministic mock provider added |
+| Versioned prompt files (`ai/prompts/v1/`) | [✓] Done | Growth insight + assistant prompts moved out of controller |
+| `AiController` endpoints | [~] Partial | Main endpoints exist; full intelligence surface still pending |
+| Repo analysis prompt + pipeline | [✓] Done | Prompt extracted to `ai/prompts/v1/repo-analysis.prompt.ts` |
+| Weekly insight prompt + pipeline | [✓] Done | Added weekly prompt + `InsightGenJob` |
 
 ### Phase 2.7 — Jobs Module
 | Task | Status | Notes |
@@ -230,7 +230,7 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | `AiAnalysisJob` — `@Cron('0 3 * * *')` | [✓] Done | With cost guard (1/user/day) |
 | `StreakComputeJob` | [✓] Done | |
 | BullMQ upgrade comment in every job | [✓] Done | |
-| `InsightGenJob` — weekly AI insights | [ ] Not Started | `@Cron('0 4 * * 1')` |
+| `InsightGenJob` — weekly AI insights | [✓] Done | `@Cron('0 4 * * 1')` |
 | `GraphComputeJob` (V2.1) | [ ] Not Started | DeveloperGraph |
 | `DnaAnalysisJob` (V2.1) | [ ] Not Started | ProjectDNA |
 | `MomentumScanJob` (V2.1) | [ ] Not Started | Burnout detection |
@@ -306,7 +306,7 @@ Configure these on Vercel to allow the Next.js web application to connect:
 | Task | Status | Notes |
 |------|--------|-------|
 | Global throttler (10/s burst, 100/min) | [✓] Done | `@nestjs/throttler` |
-| Per-endpoint limits (auth routes: 5/min) | [ ] Not Started | Arch doc specifies per-endpoint |
+| Per-endpoint limits (auth routes: 5/min) | [~] Partial | GitHub auth/sync routes throttled; more endpoints can be tuned later |
 | GitHub API rate limit detection | [✓] Done | Skip user if < 100 remaining |
 | Manual sync throttle (1/hr per user) | [ ] Not Started | |
 | AI analysis cost guard (1/user/day) | [✓] Done | |
@@ -466,4 +466,4 @@ If you needed to demo DevTrack V2 **today**, here's what works:
 
 ---
 
-*Last updated: May 29, 2026 | Generated from architecture audit of docs/architecure + docs/monorepo*
+*Last updated: May 30, 2026 | Generated from architecture audit of docs/architecure + docs/monorepo*
